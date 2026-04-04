@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Request, Response, NextFunction } from "express";
-import { createServerClient } from "../lib/supabase";
+import { createServerClient } from "../../lib/supabase";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
