@@ -31,10 +31,6 @@ export default function AccountManagement() {
               <span className="icon-circle">A</span>
               <h2>Account Management</h2>
             </div>
-            <p className="muted">
-              Admins can ban KU members and remove posts. All actions are logged in admin_logs.
-            </p>
-            <div className="info-banner">Mock preview: admin tools are visible to everyone.</div>
             <div className="admin-tools">
               <input
                 className="text-input"
