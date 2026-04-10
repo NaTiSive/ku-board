@@ -242,13 +242,19 @@
   flex-direction: column;
   gap: 10px;
   animation: floatIn 0.4s ease both;
+  border: none;
 }
 
 .post-header {
   display: grid;
-  grid-template-columns: auto 1fr auto auto;
+  grid-template-columns: auto auto 1fr auto auto;
   align-items: center;
   gap: 8px;
+}
+
+.post-back {
+  width: 28px;
+  height: 28px;
 }
 
 .avatar {
@@ -344,11 +350,13 @@
 }
 
 .create-post {
-  max-width: 520px;
-  margin: 0 auto;
+  max-width: 100%;
+  width: 100%;
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  border: none;
 }
 
 .create-post-header {
@@ -364,10 +372,14 @@
 
 .upload-box {
   border: 1px solid var(--line);
-  background: #f1f1f1;
-  padding: 32px 16px;
+  background: #dcdcdc;
+  padding: 48px 16px;
   text-align: center;
   cursor: pointer;
+  min-height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .upload-box input {
@@ -423,6 +435,13 @@
 .table-row.header {
   background: #f7f7f7;
   font-weight: 600;
+}
+
+.admin-tools {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
 }
 
 .status-pill {
@@ -521,6 +540,8 @@
   border: 1px solid var(--line);
   padding: 10px 12px;
   font-size: 12px;
+  border-radius: 14px;
+  background: #e0e0e0;
 }
 
 .comment-head {
@@ -529,6 +550,18 @@
   font-size: 11px;
   margin-bottom: 6px;
 }
+
+.post-detail {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.post-detail-body {
+  width: 100%;
+}
+
 
 .profile-card {
   max-width: 520px;

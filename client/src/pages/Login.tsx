@@ -38,8 +38,15 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const { login, loading } = useAuth()
+  const [redirecting, setRedirecting] = useState(false)
+  const { loading } = useAuth()
   const navigate = useNavigate()
+  const serverBase = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3000'
+
+  const startOAuth = () => {
+    setRedirecting(true)
+    window.location.href = `${serverBase}/api/auth/google?redirect=/feed`
+  }
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -50,13 +57,7 @@ export default function Login() {
       return
     }
 
-    const result = await login(email, password)
-    if (result.success) {
-      navigate(result.redirect ?? '/')
-      return
-    }
-
-    setError(result.message || 'เข้าสู่ระบบไม่สำเร็จ')
+    startOAuth()
   }
 
   return (
@@ -94,7 +95,7 @@ export default function Login() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                disabled={loading}
+                disabled={loading || redirecting}
               />
             </div>
           </div>
@@ -113,47 +114,40 @@ export default function Login() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
-                disabled={loading}
+                disabled={loading || redirecting}
               />
             </div>
           </div>
 
           {error && <div className="login-error">{error}</div>}
 
-          <button className="button button-primary" type="submit" disabled={loading}>
-            {loading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
+          <button className="button button-primary" type="submit" disabled={loading || redirecting}>
+            {redirecting ? 'กำลังพาไปยัง KU SSO...' : 'เข้าสู่ระบบ'}
           </button>
 
-          <button
-            className="button button-outline"
-            type="button"
-            onClick={() => navigate('/feed')}
-            disabled={loading}
-          >
+          <button className="button button-outline" type="button" onClick={() => navigate('/feed')}>
             Continue as guest
           </button>
 
-          <button
-            className="button button-outline login-google"
-            type="button"
-            onClick={() => {
-              try {
-                window.location.href = `/api/auth/google-login?redirect=${encodeURIComponent(
-                  '/auth/google-callback',
-                )}`
-              } catch (oauthError) {
-                console.error('Google OAuth redirect failed:', oauthError)
-                alert('ไม่สามารถเปลี่ยนเส้นทางไปยัง Google OAuth ได้ กรุณาลองใหม่')
-              }
-            }}
-          >
+          <button className="button button-outline login-google" type="button" onClick={startOAuth}>
             <span className="login-icon google">
               <IconGoogle />
             </span>
             เข้าสู่ระบบด้วย Google (เฉพาะอีเมล KU)
           </button>
         </form>
+
+        <button className="button button-ghost" type="button" onClick={() => navigate('/create-account')}>
+          สมัครสมาชิกนิสิต
+        </button>
+
+        <div className="login-help">
+          ต้องการความช่วยเหลือในการเข้าสู่ระบบ?
+          <span>ติดต่อฝ่ายไอที</span>
+        </div>
       </div>
+
+      <footer className="login-bottom">© 2024 มหาวิทยาลัยเกษตรศาสตร์ สงวนลิขสิทธิ์</footer>
     </section>
   )
 }

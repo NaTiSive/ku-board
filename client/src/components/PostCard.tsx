@@ -7,6 +7,8 @@ import ShareButton from './ShareButton'
 interface PostCardProps {
   post: Post
   index?: number
+  showReport?: boolean
+  showBack?: boolean
 }
 
 function formatDate(value: string) {
@@ -35,7 +37,24 @@ function IconEdit() {
   )
 }
 
-export default function PostCard({ post, index = 0 }: PostCardProps) {
+function IconFlag() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 3v18" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M6 4h12l-2 4 2 4H6" fill="none" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  )
+}
+
+function IconBack() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M15 6 9 12l6 6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+export default function PostCard({ post, index = 0, showReport = false, showBack = false }: PostCardProps) {
   const { user, isAdmin, isGuest } = useAuth()
   const isAuthor = user.id === post.author.id
   const canEdit = isAuthor
@@ -44,7 +63,12 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
   return (
     <article className="card post-card" style={{ animationDelay: `${index * 0.05}s` }}>
       <header className="post-header">
-        <div className="avatar">{post.author.name.slice(0, 2).toUpperCase()}</div>
+        {showBack && (
+          <Link className="icon-button post-back" to="/feed" aria-label="Back">
+            <IconBack />
+          </Link>
+        )}
+        <div className="avatar">{post.author.name.slice(0, 1).toUpperCase()}</div>
         <div className="post-meta">
           <strong>{post.author.name}</strong>
           <span className="muted">@{post.author.handle}</span>
@@ -76,6 +100,12 @@ export default function PostCard({ post, index = 0 }: PostCardProps) {
           <span className="action-count">{post.comments}</span>
         </Link>
         <ShareButton shareUrl={new URL(`/post/${post.id}`, window.location.origin).toString()} initialCount={post.shares} />
+        {showReport && (
+          <button className="action-button" type="button">
+            <IconFlag />
+            <span className="action-text">report</span>
+          </button>
+        )}
         {canEdit && (
           <button className="action-button" type="button">
             <IconEdit />

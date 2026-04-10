@@ -120,6 +120,9 @@ export default function NavigationBar() {
                 <Link className="menu-item" to="/settings" onClick={() => setMenuOpen(false)}>
                   Settings
                 </Link>
+                <Link className="menu-item" to="/admin/accounts" onClick={() => setMenuOpen(false)}>
+                  Account Management
+                </Link>
                 <button className="menu-item" type="button">
                   Incognito Mode
                 </button>

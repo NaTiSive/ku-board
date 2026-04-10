@@ -15,6 +15,7 @@ import postRouter     from "./routes/posts/[postId]";
 import likesRouter    from "./routes/posts/likes";
 import commentsRouter from "./routes/posts/comments";
 import sharesRouter   from "./routes/posts/shares";
+import authRouter from "./routes/auth";
 
 const app = express();
 
@@ -46,6 +47,9 @@ app.get("/api/health", (_req, res) => {
 
 // ShowBoard: Public feed
 app.use("/api/board", boardRouter);
+
+// Auth (OAuth)
+app.use("/api/auth", authRouter);
 
 // Profile: ดู profile + profile board
 app.use("/api/profile", profileRouter);

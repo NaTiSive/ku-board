@@ -20,8 +20,20 @@ export default function ViewPost() {
 
   return (
     <section className="page">
-      <PostCard post={post} />
-      <CommentSection initialComments={mockComments} />
+      <div className="feed-layout">
+        <div className="feed-main">
+          <PostCard post={post} showReport showBack />
+          <CommentSection initialComments={mockComments} />
+        </div>
+        <aside className="feed-side">
+          <div className="side-header">Recent Updates</div>
+          <div className="side-list">
+            <div className="side-item">Dorm swap updates</div>
+            <div className="side-item">KU Music Night</div>
+            <div className="side-item">Library open late</div>
+          </div>
+        </aside>
+      </div>
     </section>
   )
 }
