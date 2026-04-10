@@ -1,29 +1,79 @@
-import { useState, useEffect } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
-import axios from 'axios'
+import { AuthProvider } from './context/AuthContext'
+import NavigationBar from './components/NavigationBar'
+import FeedPage from './pages/Feed'
+import Login from './pages/Login'
+import CreateAccount from './pages/CreateAccount'
+import Profile from './pages/Profile'
+import ViewPost from './pages/ViewPost'
+import AccountManagement from './pages/admin/AccountManagement'
+import CreatePostPage from './pages/CreatePostPage'
+import Notifications from './pages/Notifications'
+import Messages from './pages/Messages'
+import Settings from './pages/Settings'
+
+function NotFound() {
+  return (
+    <section className="page">
+      <div className="card hero-card">
+        <p className="eyebrow">Lost in the quad</p>
+        <h1>We could not find that page.</h1>
+        <p className="muted">Check the link or head back to the main board.</p>
+      </div>
+    </section>
+  )
+}
 
 function App() {
-  const [data, setData] = useState(0)
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppLayout />
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
 
-  useEffect(() => {
-
-    axios.get('http://localhost:3000/api/data').then(res => {
-      setData(res.data);
-    }).catch(err => {
-      console.error("Error fetchinf data: ", err)
-    })
-
-  }, [])
+function AppLayout() {
+  const location = useLocation()
+  const isAuthRoute =
+    location.pathname === '/' ||
+    location.pathname === '/login' ||
+    location.pathname === '/create-account'
 
   return (
-    <>
-      <div>
-        {data.message}
-      </div>
-    </>
+    <div className={`app-shell ${isAuthRoute ? 'auth-shell' : ''}`}>
+      {!isAuthRoute && <NavigationBar />}
+      <main className="app-main">
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/feed" element={<FeedPage />} />
+          <Route path="/create" element={<CreatePostPage />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/create-account" element={<CreateAccount />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/post/:id" element={<ViewPost />} />
+          <Route path="/admin/accounts" element={<AccountManagement />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </main>
+      {!isAuthRoute && (
+        <footer className="app-footer">
+          <div>
+            <strong>KUBoard</strong> is a campus-only board. Guests can read. KU members can post.
+          </div>
+          <div className="footer-links">
+            <span>Realtime feed</span>
+            <span>Safe sharing</span>
+            <span>Admin-ready</span>
+          </div>
+        </footer>
+      )}
+    </div>
   )
 }
 
