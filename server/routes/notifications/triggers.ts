@@ -1,0 +1,205 @@
+// server/routes/notifications/triggers.ts
+// ─────────────────────────────────────────────────────────────────────────────
+// Helper functions สำหรับสร้าง notification หลังจาก action ต่างๆ เกิดขึ้น
+//
+// เรียกใช้จาก route handler อื่น เช่น:
+//   - likes.ts     → หลัง toggle like สำเร็จ
+//   - comments.ts  → หลัง insert comment สำเร็จ
+//   - follows/index.ts → หลัง follow สำเร็จ
+//   - posts/index.ts   → หลัง create post สำเร็จ (แจ้ง followers)
+//
+// ทุก function เป็น fire-and-forget (ไม่ await ใน route handler)
+// เพื่อไม่ให้ทำให้ response ช้า แม้ notification จะ fail ก็ไม่กระทบ user
+// ─────────────────────────────────────────────────────────────────────────────
+ 
+import { SupabaseClient } from "@supabase/supabase-js";
+ 
+// ─── Like Notification ────────────────────────────────────────────────────────
+ 
+/**
+ * แจ้งเตือนเจ้าของโพสเมื่อมีคนกด like
+ * ไม่แจ้งถ้า: liker เป็นเจ้าของโพสเอง
+ *
+ * @param supabase  Supabase client (server-side)
+ * @param postId    โพสที่ถูก like
+ * @param likerId   user ที่กด like
+ */
+export async function notifyLike(
+  supabase: SupabaseClient,
+  postId: string,
+  likerId: string
+): Promise<void> {
+  try {
+    // ดึง author ของโพสที่ถูก like
+    const { data: post } = await supabase
+      .from("posts")
+      .select("author_id, content")
+      .eq("id", postId)
+      .single();
+ 
+    if (!post) return;
+ 
+    // ไม่แจ้งตัวเอง
+    if (post.author_id === likerId) return;
+ 
+    // สร้าง notification ผ่าน DB function (จัดการ duplicate ให้อัตโนมัติ)
+    await supabase.rpc("create_notification", {
+      p_recipient_id: post.author_id,
+      p_actor_id:     likerId,
+      p_type:         "like",
+      p_post_id:      postId,
+      p_body:         null,
+    });
+  } catch (e) {
+    // notification fail ไม่กระทบ main action
+    console.error("[notifyLike]", e);
+  }
+}
+ 
+// ─── Comment Notification ─────────────────────────────────────────────────────
+ 
+/**
+ * แจ้งเตือน 2 กลุ่มเมื่อมีคอมเมนต์ใหม่:
+ * 1. เจ้าของโพส (type: 'comment')
+ * 2. คนที่เคย like หรือ comment โพสเดียวกัน (type: 'post_activity')
+ *    — ยกเว้นคนที่เพิ่งคอมเมนต์ และเจ้าของโพส (รับแจ้งจากกลุ่ม 1 แล้ว)
+ *
+ * @param supabase    Supabase client
+ * @param postId      โพสที่ถูกคอมเมนต์
+ * @param commenterId user ที่คอมเมนต์ (null = Guest)
+ * @param commentBody preview ข้อความคอมเมนต์ (100 ตัวแรก)
+ */
+export async function notifyComment(
+  supabase: SupabaseClient,
+  postId: string,
+  commenterId: string | null,
+  commentBody: string
+): Promise<void> {
+  if (!commenterId) return; // Guest comment ไม่ trigger notification
+ 
+  try {
+    // ดึงข้อมูลโพส
+    const { data: post } = await supabase
+      .from("posts")
+      .select("author_id")
+      .eq("id", postId)
+      .single();
+ 
+    if (!post) return;
+ 
+    const preview = commentBody.slice(0, 100); // preview 100 ตัวแรก
+ 
+    // 1. แจ้งเจ้าของโพส
+    if (post.author_id !== commenterId) {
+      await supabase.rpc("create_notification", {
+        p_recipient_id: post.author_id,
+        p_actor_id:     commenterId,
+        p_type:         "comment",
+        p_post_id:      postId,
+        p_body:         preview,
+      });
+    }
+ 
+    // 2. รวบรวม user ที่เคย interact กับโพสนี้ (like + comment)
+    const [{ data: likers }, { data: commenters }] = await Promise.all([
+      supabase
+        .from("likes")
+        .select("user_id")
+        .eq("post_id", postId),
+      supabase
+        .from("comments")
+        .select("author_id")
+        .eq("post_id", postId)
+        .not("author_id", "is", null),
+    ]);
+ 
+    // รวม user ids และกรองออก: ตัวคอมเมนต์เอง + เจ้าของโพส (รับแล้ว)
+    const interactedIds = new Set([
+      ...(likers ?? []).map((l) => l.user_id),
+      ...(commenters ?? []).map((c) => c.author_id),
+    ]);
+    interactedIds.delete(commenterId);
+    interactedIds.delete(post.author_id);
+ 
+    // แจ้ง post_activity ให้ทุกคนที่ interact ไว้
+    const notifyPromises = [...interactedIds].map((uid) =>
+      supabase.rpc("create_notification", {
+        p_recipient_id: uid,
+        p_actor_id:     commenterId,
+        p_type:         "post_activity",
+        p_post_id:      postId,
+        p_body:         preview,
+      })
+    );
+    await Promise.allSettled(notifyPromises); // allSettled = ไม่ throw ถ้าบางอันล้มเหลว
+  } catch (e) {
+    console.error("[notifyComment]", e);
+  }
+}
+ 
+// ─── Follow Notification ──────────────────────────────────────────────────────
+ 
+/**
+ * แจ้งเตือน user ที่ถูกติดตาม
+ *
+ * @param supabase     Supabase client
+ * @param followerId   user ที่กดติดตาม
+ * @param followingId  user ที่ถูกติดตาม
+ */
+export async function notifyFollow(
+  supabase: SupabaseClient,
+  followerId: string,
+  followingId: string
+): Promise<void> {
+  try {
+    await supabase.rpc("create_notification", {
+      p_recipient_id: followingId,
+      p_actor_id:     followerId,
+      p_type:         "follow",
+      p_post_id:      null,
+      p_body:         null,
+    });
+  } catch (e) {
+    console.error("[notifyFollow]", e);
+  }
+}
+ 
+// ─── New Post Notification ────────────────────────────────────────────────────
+ 
+/**
+ * แจ้งเตือน followers ทั้งหมดของผู้โพสว่ามีโพสใหม่
+ * ทำงานแบบ batch เพื่อรองรับ followers จำนวนมาก
+ *
+ * @param supabase   Supabase client
+ * @param postId     โพสใหม่
+ * @param authorId   เจ้าของโพส
+ */
+export async function notifyNewPost(
+  supabase: SupabaseClient,
+  postId: string,
+  authorId: string
+): Promise<void> {
+  try {
+    // ดึง followers ทั้งหมดของ author
+    const { data: followers } = await supabase
+      .from("follows")
+      .select("follower_id")
+      .eq("following_id", authorId);
+ 
+    if (!followers || followers.length === 0) return;
+ 
+    // แจ้งทุก follower พร้อมกัน (allSettled = ไม่หยุดถ้าบางอันล้มเหลว)
+    const promises = followers.map((f) =>
+      supabase.rpc("create_notification", {
+        p_recipient_id: f.follower_id,
+        p_actor_id:     authorId,
+        p_type:         "new_post",
+        p_post_id:      postId,
+        p_body:         null,
+      })
+    );
+    await Promise.allSettled(promises);
+  } catch (e) {
+    console.error("[notifyNewPost]", e);
+  }
+}
