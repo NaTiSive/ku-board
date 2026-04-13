@@ -19,6 +19,7 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { ok, err, requireKUMember } from "../../lib/api";
 import { notifyNewPost } from "../notifications/triggers"; // [ใหม่]
+import { syncPostHashtags } from "../../lib/hashtag";      // [ใหม่ - search]
  
 const router = Router();
  
@@ -34,6 +35,7 @@ router.post("/", async (req: Request, res: Response) => {
     const { user, supabase } = ctx;
  
     const content      = (req.body?.content ?? "").trim();
+    const title        = (req.body?.title   ?? "").trim();  // [ใหม่ - search] optional
     const imageBase64  = req.body?.image_base64 as string | undefined; // [เปลี่ยน]
     const imageType    = req.body?.image_type   as string | undefined; // [เปลี่ยน]
  
@@ -89,7 +91,7 @@ router.post("/", async (req: Request, res: Response) => {
     // ── บันทึกโพสลง Database ─────────────────────────────────────────────────
     const { data: post, error } = await supabase
       .from("posts")
-      .insert({ author_id: user.id, content, image_url: imageUrl })
+      .insert({ author_id: user.id, title: title || null, content, image_url: imageUrl }) // [เปลี่ยน - search] เพิ่ม title
       .select(
         `
         id, content, image_url, created_at, updated_at,
@@ -99,6 +101,9 @@ router.post("/", async (req: Request, res: Response) => {
       .single();
  
     if (error) throw error;
+ 
+    // [ใหม่ - search] sync hashtags จาก title + content — fire-and-forget
+    syncPostHashtags(supabase, post.id, title, content);
  
     // [ใหม่] แจ้ง followers ว่ามีโพสใหม่ — fire-and-forget
     notifyNewPost(supabase, post.id, user.id);

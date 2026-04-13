@@ -24,6 +24,7 @@ import authRouter     from "./routes/auth";
 // ── Import Routers (ใหม่) ────────────────────────────────────────────────────
 import followsRouter        from "./routes/follows/index";        // [ใหม่]
 import notificationsRouter  from "./routes/notifications/index";  // [ใหม่]
+import searchRouter         from "./routes/search";               // [ใหม่]
  
 const app = express();
  
@@ -63,6 +64,7 @@ app.use("/api/posts/:postId/comments",  commentsRouter);
 app.use("/api/posts/:postId/shares",    sharesRouter);
  
 // ── Routes (ใหม่) ────────────────────────────────────────────────────────────
+app.use("/api/search",        searchRouter);        // [ใหม่]
 app.use("/api/follows",       followsRouter);       // [ใหม่]
 app.use("/api/notifications", notificationsRouter); // [ใหม่]
  
