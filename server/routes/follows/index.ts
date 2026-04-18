@@ -94,7 +94,9 @@ router.post("/:userId", async (req: Request, res: Response) => {
     if (!ctx) return;
  
     const { user, supabase } = ctx;
-    const targetId = req.params.userId;
+    const targetId = Array.isArray(req.params.userId) ? req.params.userId[0] : req.params.userId;
+
+    if (!targetId) return err(res, "Missing user id", 400);
  
     // ห้ามติดตามตัวเอง
     if (user.id === targetId) {

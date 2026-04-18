@@ -1,8 +1,12 @@
-﻿import { Link } from 'react-router-dom'
+import { useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import type { Post } from '../types'
 import { useAuth } from '../hooks/useAuth'
+import { deletePost } from '../lib/postApi'
+import { serverBase } from '../lib/serverBase'
 import LikeButton from './LikeButton'
 import ShareButton from './ShareButton'
+import Avatar from './Avatar'
 
 interface PostCardProps {
   post: Post
@@ -29,14 +33,6 @@ function IconComment() {
   )
 }
 
-function IconEdit() {
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M4 20h6l9-9-6-6-9 9v6Z" fill="none" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  )
-}
-
 function IconFlag() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -54,11 +50,56 @@ function IconBack() {
   )
 }
 
+function IconMore() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="6" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="18" cy="12" r="1.6" fill="currentColor" />
+    </svg>
+  )
+}
+
 export default function PostCard({ post, index = 0, showReport = false, showBack = false }: PostCardProps) {
-  const { user, isAdmin, isGuest } = useAuth()
+  const { user, isGuest } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const isAuthor = user.id === post.author.id
-  const canEdit = isAuthor
-  const canDelete = isAdmin || isAuthor
+  const authorProfileUrl = post.author.role !== 'guest' && post.author.id !== 'unknown' ? `/profile/${post.author.id}` : null
+
+  const handleEdit = () => {
+    setMenuOpen(false)
+    navigate(`/post/${post.id}/edit`)
+  }
+
+  const handleDelete = async () => {
+    if (deleting) {
+      return
+    }
+
+    const confirmed = window.confirm('Delete this post? This action cannot be undone.')
+    if (!confirmed) {
+      return
+    }
+
+    setDeleting(true)
+    setMenuOpen(false)
+
+    try {
+      await deletePost(serverBase, post.id)
+
+      if (location.pathname === '/feed') {
+        navigate(0)
+        return
+      }
+
+      navigate('/feed')
+    } catch {
+      setDeleting(false)
+    }
+  }
 
   return (
     <article className="card post-card" style={{ animationDelay: `${index * 0.05}s` }}>
@@ -68,18 +109,54 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
             <IconBack />
           </Link>
         )}
-        <div className="avatar">{post.author.name.slice(0, 1).toUpperCase()}</div>
-        <div className="post-meta">
-          <strong>{post.author.name}</strong>
-          <span className="muted">@{post.author.handle}</span>
-        </div>
+        {authorProfileUrl ? (
+          <Link className="author-link" to={authorProfileUrl} aria-label={`View ${post.author.name}'s profile`}>
+            <Avatar name={post.author.name} imageUrl={post.author.avatarUrl} />
+          </Link>
+        ) : (
+          <Avatar name={post.author.name} imageUrl={post.author.avatarUrl} />
+        )}
+        {authorProfileUrl ? (
+          <Link className="post-meta author-meta-link" to={authorProfileUrl}>
+            <strong>{post.author.name}</strong>
+            <span className="muted">@{post.author.handle}</span>
+          </Link>
+        ) : (
+          <div className="post-meta">
+            <strong>{post.author.name}</strong>
+            <span className="muted">@{post.author.handle}</span>
+          </div>
+        )}
         <span className="post-time">{formatDate(post.createdAt)}</span>
-        {canDelete && (
-          <button className="button button-outline button-mini" type="button">
-            Delete
-          </button>
+        {isAuthor && (
+          <div className="post-menu">
+            <button
+              className="icon-button"
+              type="button"
+              aria-label="Post actions"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              disabled={deleting}
+            >
+              <IconMore />
+            </button>
+            {menuOpen && (
+              <div className="post-menu-panel">
+                <button className="post-menu-item" type="button" onClick={handleEdit}>
+                  Edit
+                </button>
+                <button className="post-menu-item is-danger" type="button" onClick={handleDelete}>
+                  {deleting ? 'Deleting...' : 'Delete'}
+                </button>
+              </div>
+            )}
+          </div>
         )}
       </header>
+      {post.title && (
+        <Link className="post-title" to={`/post/${post.id}`}>
+          {post.title}
+        </Link>
+      )}
       <Link className="post-content" to={`/post/${post.id}`}>
         {post.content}
       </Link>
@@ -90,26 +167,26 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
       )}
       <div className="post-actions">
         <LikeButton
+          postId={post.id}
           initialCount={post.likes}
           initiallyLiked={post.likedByMe}
-          disabledHint={isGuest ? 'Guest like saved to session only' : undefined}
+          disabled={isGuest}
+          disabledHint={isGuest ? 'Sign in with KU mail to like posts.' : undefined}
         />
         <Link className="action-button" to={`/post/${post.id}`}>
           <IconComment />
           <span className="action-text">comment</span>
           <span className="action-count">{post.comments}</span>
         </Link>
-        <ShareButton shareUrl={new URL(`/post/${post.id}`, window.location.origin).toString()} initialCount={post.shares} />
-        {showReport && (
+        <ShareButton
+          postId={post.id}
+          shareUrl={new URL(`/post/${post.id}`, window.location.origin).toString()}
+          initialCount={post.shares}
+        />
+        {showReport && !isAuthor && (
           <button className="action-button" type="button">
             <IconFlag />
             <span className="action-text">report</span>
-          </button>
-        )}
-        {canEdit && (
-          <button className="action-button" type="button">
-            <IconEdit />
-            <span className="action-text">edit</span>
           </button>
         )}
       </div>

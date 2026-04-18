@@ -34,12 +34,12 @@ router.get("/", async (req: Request, res: Response) => {
       .from("posts")
       .select(
         `
-        id, content, image_url, created_at, updated_at,
-        profiles!author_id ( id, display_name ),
+        id, title, content, image_url, created_at, updated_at,
+        profiles!author_id ( id, display_name, avatar_url ),
         likes ( count ),
         comments (
           id, content, guest_name, created_at,
-          profiles!author_id ( id, display_name )
+          profiles!author_id ( id, display_name, avatar_url )
         )
         `
       )
@@ -76,6 +76,10 @@ router.patch("/", async (req: Request, res: Response) => {
       return err(res, "Forbidden — แก้ไขได้เฉพาะโพสของตัวเองเท่านั้น", 403);
     }
  
+    const hasTitle = req.body && Object.prototype.hasOwnProperty.call(req.body, "title");
+    const title =
+      hasTitle && typeof req.body.title === "string" ? req.body.title.trim() : hasTitle ? "" : undefined;
+
     const content      = (req.body?.content ?? "").trim();
     const imageBase64  = req.body?.image_base64 as string | undefined; // [เปลี่ยน]
     const imageType    = req.body?.image_type   as string | undefined; // [เปลี่ยน]
@@ -132,6 +136,7 @@ router.patch("/", async (req: Request, res: Response) => {
  
     // ── อัปเดตโพส ────────────────────────────────────────────────────────────
     const updatePayload: Record<string, unknown> = { content };
+    if (title !== undefined) updatePayload.title = title || null;
     if (newImageUrl !== undefined) updatePayload.image_url = newImageUrl;
  
     const { data: updated, error } = await supabase
@@ -139,8 +144,8 @@ router.patch("/", async (req: Request, res: Response) => {
       .update(updatePayload)
       .eq("id", req.params.postId)
       .select(
-        `id, content, image_url, created_at, updated_at,
-        profiles!author_id ( id, display_name )`
+        `id, title, content, image_url, created_at, updated_at,
+        profiles!author_id ( id, display_name, avatar_url )`
       )
       .single();
  

@@ -1,4 +1,10 @@
-﻿import CreatePost from '../components/CreatePost'
+// client/src/pages/CreatePostPage.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Page for creating a new post. Renders the create post form and sidebar.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import CreatePost from '../components/CreatePost'
+import RecentUpdatesSidebar from '../components/RecentUpdatesSidebar'
 
 export default function CreatePostPage() {
   return (
@@ -7,14 +13,7 @@ export default function CreatePostPage() {
         <div className="feed-main">
           <CreatePost />
         </div>
-        <aside className="feed-side">
-          <div className="side-header">Recent Updates</div>
-          <div className="side-list">
-            <div className="side-item">Campus market night</div>
-            <div className="side-item">New internship posts</div>
-            <div className="side-item">Library extended hours</div>
-          </div>
-        </aside>
+        <RecentUpdatesSidebar />
       </div>
     </section>
   )

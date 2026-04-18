@@ -28,7 +28,7 @@ router.get("/", async (req: Request, res: Response) => {
       .select(
         `
         id, content, guest_name, created_at,
-        profiles!author_id ( id, display_name )
+        profiles!author_id ( id, display_name, avatar_url )
         `,
         { count: "exact" }
       )
@@ -86,7 +86,7 @@ router.post("/", async (req: Request, res: Response) => {
       .insert(insertData)
       .select(
         `id, content, guest_name, created_at,
-        profiles!author_id ( id, display_name )`
+        profiles!author_id ( id, display_name, avatar_url )`
       )
       .single();
  
@@ -95,7 +95,10 @@ router.post("/", async (req: Request, res: Response) => {
     // [ใหม่] แจ้งเตือนหลัง comment สำเร็จ — fire-and-forget
     // KU Member เท่านั้น, Guest ไม่ trigger
     if (ctx) {
-      notifyComment(supabase, req.params.postId, ctx.user.id, content);
+      const postId = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
+      if (postId) {
+        notifyComment(supabase, postId, ctx.user.id, content);
+      }
     }
  
     return ok(res, comment, 201);

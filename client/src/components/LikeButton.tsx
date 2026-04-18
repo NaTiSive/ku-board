@@ -1,6 +1,9 @@
-﻿import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { fetchLikeState, toggleLike } from '../lib/postApi'
+import { serverBase } from '../lib/serverBase'
 
 interface LikeButtonProps {
+  postId: string
   initialCount: number
   initiallyLiked?: boolean
   disabled?: boolean
@@ -17,6 +20,7 @@ function IconLike() {
 }
 
 export default function LikeButton({
+  postId,
   initialCount,
   initiallyLiked = false,
   disabled = false,
@@ -24,24 +28,58 @@ export default function LikeButton({
 }: LikeButtonProps) {
   const [liked, setLiked] = useState(initiallyLiked)
   const [count, setCount] = useState(initialCount)
+  const [submitting, setSubmitting] = useState(false)
 
-  const toggleLike = () => {
-    if (disabled) {
+  useEffect(() => {
+    let cancelled = false
+
+    const loadLikeState = async () => {
+      try {
+        const state = await fetchLikeState(serverBase, postId)
+
+        if (cancelled) {
+          return
+        }
+
+        setLiked(state.isLiked)
+        setCount(state.count)
+      } catch {
+        // Keep the incoming values if the live sync fails.
+      }
+    }
+
+    void loadLikeState()
+
+    return () => {
+      cancelled = true
+    }
+  }, [initialCount, initiallyLiked, postId])
+
+  const handleToggleLike = async () => {
+    if (disabled || submitting) {
       return
     }
-    setLiked((prev) => {
-      setCount((countValue) => countValue + (prev ? -1 : 1))
-      return !prev
-    })
+
+    setSubmitting(true)
+
+    try {
+      const state = await toggleLike(serverBase, postId)
+      setLiked(state.isLiked)
+      setCount(state.count)
+    } catch {
+      // Keep the current UI state if the request fails.
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
     <button
       className={`action-button ${liked ? 'is-active' : ''}`}
-      onClick={toggleLike}
+      onClick={handleToggleLike}
       type="button"
       title={disabledHint}
-      disabled={disabled}
+      disabled={disabled || submitting}
     >
       <IconLike />
       <span className="action-text">like</span>

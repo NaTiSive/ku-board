@@ -1,29 +1,54 @@
-﻿import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { Comment } from '../types'
 import { useAuth } from '../hooks/useAuth'
+import { createComment } from '../lib/postApi'
+import { serverBase } from '../lib/serverBase'
+import Avatar from './Avatar'
+import { Link } from 'react-router-dom'
 
 interface CommentSectionProps {
+  postId: string
   initialComments: Comment[]
+  onCommentAdded?: (_comment: Comment) => void
 }
 
-export default function CommentSection({ initialComments }: CommentSectionProps) {
+export default function CommentSection({ postId, initialComments, onCommentAdded }: CommentSectionProps) {
   const { isGuest, user } = useAuth()
   const [comments, setComments] = useState<Comment[]>(initialComments)
   const [value, setValue] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
 
   const label = useMemo(() => (isGuest ? 'Anonymous' : user.displayName), [isGuest, user.displayName])
 
-  const handleSubmit = () => {
-    if (!value.trim()) return
-    const newComment: Comment = {
-      id: `comment-${comments.length + 1}`,
-      authorName: label,
-      isAnonymous: isGuest,
-      createdAt: new Date().toISOString(),
-      content: value.trim(),
+  useEffect(() => {
+    setComments(initialComments)
+  }, [initialComments])
+
+  const handleSubmit = async () => {
+    const content = value.trim()
+
+    if (!content || submitting) {
+      return
     }
-    setComments((prev) => [newComment, ...prev])
-    setValue('')
+
+    setSubmitting(true)
+    setError('')
+
+    try {
+      const comment = await createComment(serverBase, postId, {
+        content,
+        ...(isGuest ? { guest_name: label } : {}),
+      })
+
+      setComments((prev) => [...prev, comment])
+      onCommentAdded?.(comment)
+      setValue('')
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : 'Could not post comment.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -44,22 +69,40 @@ export default function CommentSection({ initialComments }: CommentSectionProps)
           placeholder="Write a reply"
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          disabled={submitting}
         />
         <div className="comment-actions">
           <span className="muted">Posting as {label}</span>
-          <button className="button button-primary button-mini" type="button" onClick={handleSubmit}>
-            Comment
+          <button className="button button-primary button-mini" type="button" onClick={handleSubmit} disabled={submitting}>
+            {submitting ? 'Posting...' : 'Comment'}
           </button>
         </div>
+        {error && <div className="login-error">{error}</div>}
       </div>
       <div className="comment-list">
         {comments.map((comment) => (
           <div className="comment-item" key={comment.id}>
-            <div className="comment-head">
-              <strong>{comment.authorName}</strong>
-              <span className="muted">{new Date(comment.createdAt).toLocaleString('en-US')}</span>
+            {comment.authorId ? (
+              <Link className="author-link" to={`/profile/${comment.authorId}`} aria-label={`View ${comment.authorName}'s profile`}>
+                <Avatar name={comment.authorName} imageUrl={comment.authorAvatarUrl} className="comment-avatar" />
+              </Link>
+            ) : (
+              <Avatar name={comment.authorName} imageUrl={comment.authorAvatarUrl} className="comment-avatar" />
+            )}
+            <div className="comment-body">
+              <div className="comment-head">
+                {comment.authorId ? (
+                  <Link className="comment-author-link" to={`/profile/${comment.authorId}`}>
+                    <strong>{comment.authorName}</strong>
+                    {comment.authorHandle ? <span className="muted">@{comment.authorHandle}</span> : null}
+                  </Link>
+                ) : (
+                  <strong>{comment.authorName}</strong>
+                )}
+                <span className="muted">{new Date(comment.createdAt).toLocaleString('en-US')}</span>
+              </div>
+              <p>{comment.content}</p>
             </div>
-            <p>{comment.content}</p>
           </div>
         ))}
       </div>

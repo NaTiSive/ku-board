@@ -1,23 +1,21 @@
-// client/src/pages/ViewPost.tsx
+// client/src/pages/EditPostPage.tsx
 // ─────────────────────────────────────────────────────────────────────────────
-// Page used to display a single post with its comment thread.
-// Loads the post and comments by post ID from the API and renders
-// the post card plus comment section and sidebar.
+// Edit post page for loading an existing post and updating it.
+// Only the post owner can access this page and submit edits.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import CommentSection from '../components/CommentSection'
-import PostCard from '../components/PostCard'
-import RecentUpdatesSidebar from '../components/RecentUpdatesSidebar'
+import EditPost from '../components/EditPost'
+import { useAuth } from '../hooks/useAuth'
 import { fetchPostById } from '../lib/postApi'
 import { serverBase } from '../lib/serverBase'
-import type { Comment, Post } from '../types'
+import type { Post } from '../types'
 
-export default function ViewPost() {
+export default function EditPostPage() {
   const { id } = useParams()
+  const { user, loading: authLoading, isGuest } = useAuth()
   const [post, setPost] = useState<Post | null>(null)
-  const [comments, setComments] = useState<Comment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -42,7 +40,6 @@ export default function ViewPost() {
         }
 
         setPost(data.post)
-        setComments(data.comments)
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load post.')
@@ -54,19 +51,21 @@ export default function ViewPost() {
       }
     }
 
-    void loadPost()
+    if (!authLoading) {
+      void loadPost()
+    }
 
     return () => {
       cancelled = true
     }
-  }, [id])
+  }, [authLoading, id])
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <section className="page">
         <div className="card">
           <h2>Loading post...</h2>
-          <p className="muted">Fetching the latest post details from the API.</p>
+          <p className="muted">Preparing the editor.</p>
         </div>
       </section>
     )
@@ -84,11 +83,15 @@ export default function ViewPost() {
   }
 
   if (!post) {
+    return null
+  }
+
+  if (isGuest || user.id !== post.author.id) {
     return (
       <section className="page">
         <div className="card">
-          <h2>Post not found</h2>
-          <p className="muted">The shareable link may be outdated.</p>
+          <h2>Not allowed</h2>
+          <p className="muted">Only the post owner can edit this post.</p>
         </div>
       </section>
     )
@@ -98,17 +101,21 @@ export default function ViewPost() {
     <section className="page">
       <div className="feed-layout">
         <div className="feed-main">
-          <PostCard post={post} showReport showBack />
-          <CommentSection
+          <EditPost
             postId={post.id}
-            initialComments={comments}
-            onCommentAdded={(comment) => {
-              setComments((prev) => [...prev, comment])
-              setPost((current) => (current ? { ...current, comments: current.comments + 1 } : current))
-            }}
+            initialTitle={post.title}
+            initialContent={post.content}
+            initialImage={post.image}
           />
         </div>
-        <RecentUpdatesSidebar />
+        <aside className="feed-side">
+          <div className="side-header">Editing Tips</div>
+          <div className="side-list">
+            <div className="side-item">Keep your update clear and concise.</div>
+            <div className="side-item">You can replace or remove the existing image.</div>
+            <div className="side-item">Saving will return you to the post page.</div>
+          </div>
+        </aside>
       </div>
     </section>
   )

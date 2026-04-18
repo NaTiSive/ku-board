@@ -7,11 +7,12 @@ import Login from './pages/Login'
 import CreateAccount from './pages/CreateAccount'
 import Profile from './pages/Profile'
 import ViewPost from './pages/ViewPost'
+import EditPostPage from './pages/EditPostPage'
 import AccountManagement from './pages/admin/AccountManagement'
 import CreatePostPage from './pages/CreatePostPage'
 import Notifications from './pages/Notifications'
-import Messages from './pages/Messages'
 import Settings from './pages/Settings'
+import SearchPage from './pages/Search'
 
 function NotFound() {
   return (
@@ -50,13 +51,14 @@ function AppLayout() {
           <Route path="/" element={<Login />} />
           <Route path="/feed" element={<FeedPage />} />
           <Route path="/create" element={<CreatePostPage />} />
+          <Route path="/search" element={<SearchPage />} />
           <Route path="/notifications" element={<Notifications />} />
-          <Route path="/messages" element={<Messages />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/login" element={<Login />} />
           <Route path="/create-account" element={<CreateAccount />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/profile/:userId?" element={<Profile />} />
           <Route path="/post/:id" element={<ViewPost />} />
+          <Route path="/post/:id/edit" element={<EditPostPage />} />
           <Route path="/admin/accounts" element={<AccountManagement />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

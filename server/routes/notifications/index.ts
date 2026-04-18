@@ -9,6 +9,7 @@
 import { Router } from "express";
 import type { Request, Response } from "express";
 import { ok, err, requireKUMember, getPagination } from "../../lib/api";
+import { toNotificationListItem } from "../../lib/notifications";
  
 const router = Router();
  
@@ -49,7 +50,9 @@ router.get("/", async (req: Request, res: Response) => {
     if (error) throw error;
  
     return ok(res, {
-      notifications: notifications ?? [],
+      notifications: (notifications ?? []).map((notification) =>
+        toNotificationListItem(notification)
+      ),
       total: count ?? 0,
       page,
       limit,

@@ -1,8 +1,15 @@
-﻿import { useState } from 'react'
+﻿// client/src/pages/Login.tsx
+// ─────────────────────────────────────────────────────────────────────────────
+// Login page for KUBoard authentication.
+// Handles email/password sign-in and Google OAuth flow.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import KULogo from '../assets/ku-logo.svg'
+import { serverBase } from '../lib/serverBase'
 
 function IconUser() {
   return (
@@ -25,11 +32,22 @@ function IconLock() {
 function IconGoogle() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="11" stroke="currentColor" strokeWidth="2" fill="none" />
-      <path d="M12 7a5 5 0 0 1 4.6 2.4" stroke="currentColor" strokeWidth="2" fill="none" />
-      <path d="M17 12h-5v5" stroke="currentColor" strokeWidth="2" fill="none" />
-      <path d="M7.2 9.4A5 5 0 0 1 12 7" stroke="currentColor" strokeWidth="2" fill="none" />
-      <path d="M7 12a5 5 0 0 0 5 5" stroke="currentColor" strokeWidth="2" fill="none" />
+      <path
+        d="M21.81 12.23c0-.72-.06-1.25-.19-1.8H12.2v3.56h5.53c-.11.89-.7 2.24-2.02 3.14l-.02.12 2.91 2.21.2.02c1.84-1.66 3-4.1 3-7.25Z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12.2 21.9c2.71 0 4.98-.87 6.64-2.37l-3.09-2.35c-.83.57-1.95.97-3.55.97-2.66 0-4.91-1.73-5.72-4.12l-.12.01-3.03 2.29-.04.11c1.65 3.2 5.04 5.46 8.91 5.46Z"
+        fill="#34A853"
+      />
+      <path
+        d="M6.48 14.03a5.78 5.78 0 0 1-.34-1.95c0-.68.13-1.33.33-1.95l-.01-.13-3.08-2.33-.1.05A9.78 9.78 0 0 0 2.2 12.08c0 1.56.38 3.04 1.08 4.36l3.2-2.41Z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12.2 5.99c2.03 0 3.4.86 4.18 1.58l3.05-2.91C17.17 2.61 14.91 1.5 12.2 1.5c-3.87 0-7.26 2.26-8.91 5.46l3.2 2.41c.82-2.39 3.07-4.12 5.71-4.12Z"
+        fill="#EA4335"
+      />
     </svg>
   )
 }
@@ -38,10 +56,10 @@ export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
-  const { loading } = useAuth()
+  const { loading, login, refreshUser } = useAuth()
   const navigate = useNavigate()
-  const serverBase = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:3000'
 
   const startOAuth = () => {
     setRedirecting(true)
@@ -57,7 +75,17 @@ export default function Login() {
       return
     }
 
-    startOAuth()
+    setSubmitting(true)
+
+    const result = await login({ email, password })
+    if (!result.success) {
+      setError(result.message || 'เข้าสู่ระบบไม่สำเร็จ')
+      setSubmitting(false)
+      return
+    }
+
+    refreshUser()
+    navigate('/feed')
   }
 
   return (
@@ -95,7 +123,7 @@ export default function Login() {
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
                 required
-                disabled={loading || redirecting}
+                disabled={loading || redirecting || submitting}
               />
             </div>
           </div>
@@ -114,30 +142,40 @@ export default function Login() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
-                disabled={loading || redirecting}
+                disabled={loading || redirecting || submitting}
               />
             </div>
           </div>
 
           {error && <div className="login-error">{error}</div>}
 
-          <button className="button button-primary" type="submit" disabled={loading || redirecting}>
-            {redirecting ? 'กำลังพาไปยัง KU SSO...' : 'เข้าสู่ระบบ'}
+          <button className="button button-primary login-action-button" type="submit" disabled={loading || redirecting || submitting}>
+            {submitting ? 'กำลังเข้าสู่ระบบ...' : redirecting ? 'กำลังพาไปยัง KU SSO...' : 'เข้าสู่ระบบ'}
           </button>
 
-          <button className="button button-outline" type="button" onClick={() => navigate('/feed')}>
-            Continue as guest
-          </button>
+          <div className="login-alt-actions">
+            <button className="button button-outline login-action-button" type="button" onClick={() => navigate('/feed')}>
+              Continue as guest
+            </button>
 
-          <button className="button button-outline login-google" type="button" onClick={startOAuth}>
-            <span className="login-icon google">
-              <IconGoogle />
-            </span>
-            เข้าสู่ระบบด้วย Google (เฉพาะอีเมล KU)
-          </button>
+            <button
+              className="button login-action-button login-google login-google-prominent"
+              type="button"
+              onClick={startOAuth}
+              disabled={loading || redirecting || submitting}
+            >
+              <span className="login-google-badge" aria-hidden="true">
+                <IconGoogle />
+              </span>
+              <span className="login-google-copy">
+                <strong>Continue with Google</strong>
+                <small>KU email only</small>
+              </span>
+            </button>
+          </div>
         </form>
 
-        <button className="button button-ghost" type="button" onClick={() => navigate('/create-account')}>
+        <button className="button button-ghost login-action-button" type="button" onClick={() => navigate('/create-account')}>
           สมัครสมาชิกนิสิต
         </button>
 

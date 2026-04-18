@@ -99,7 +99,10 @@ router.post("/", async (req: Request, res: Response) => {
         .eq("post_id", req.params.postId);
  
       // [ใหม่] แจ้งเจ้าของโพส — fire-and-forget (ไม่ await เพื่อไม่ให้ช้า)
-      notifyLike(supabase, req.params.postId, user.id);
+      const postId = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
+      if (postId) {
+        notifyLike(supabase, postId, user.id);
+      }
  
       return ok(res, { action: "liked", like_count: count ?? 0, is_liked: true });
     }

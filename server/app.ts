@@ -2,6 +2,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Express app หลัก — เชื่อม middleware และ router ทั้งหมดเข้าด้วยกัน
 //
+// ใช้งานโดย server/index.ts หรือ entrypoint ของแอป เพื่อ expose API
+// ผ่าน /api/* endpoints บน Express
+//
 // [เปลี่ยนแปลง] เพิ่ม mount routes ใหม่:
 //   - /api/follows       → ระบบติดตาม
 //   - /api/notifications → ระบบแจ้งเตือน
@@ -20,6 +23,7 @@ import likesRouter    from "./routes/posts/likes";
 import commentsRouter from "./routes/posts/comments";
 import sharesRouter   from "./routes/posts/shares";
 import authRouter     from "./routes/auth";
+import adminRouter    from "./routes/admin/index";
  
 // ── Import Routers (ใหม่) ────────────────────────────────────────────────────
 import followsRouter        from "./routes/follows/index";        // [ใหม่]
@@ -55,6 +59,7 @@ app.get("/api/health", (_req, res) => {
 // ── Routes (เดิม) ────────────────────────────────────────────────────────────
 app.use("/api/board",   boardRouter);
 app.use("/api/auth",    authRouter);
+app.use("/api/admin",   adminRouter);
 app.use("/api/profile", profileRouter);
 app.use("/api/posts",   postsRouter);
  

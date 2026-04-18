@@ -24,13 +24,15 @@ const router = Router();
 // POST SELECT fragment ที่ใช้ซ้ำทุก query
 const POST_SELECT = `
   id,
+  title,
   content,
   image_url,
   created_at,
   updated_at,
   profiles!author_id (
     id,
-    display_name
+    display_name,
+    avatar_url
   ),
   likes ( count ),
   comments ( count )

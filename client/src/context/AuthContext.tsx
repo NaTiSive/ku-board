@@ -1,145 +1,219 @@
-﻿import { createContext, useMemo, useState } from 'react'
+import { createContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Role, UserProfile } from '../types'
+import type { UserProfile } from '../types'
+import { loginWithPassword, logoutSession, registerWithPassword } from '../lib/authApi'
+import { serverBase } from '../lib/serverBase'
+import { readSupabaseSession } from '../lib/supabaseSession'
 
-const MOCK_GUEST_MODE = true
+interface RegisterPayload {
+  email: string
+  password: string
+  fullname: string
+}
+
+interface RegisterResult {
+  success: boolean
+  message?: string
+}
 
 interface AuthContextValue {
   user: UserProfile
-  isGuest: boolean
-  isMember: boolean
-  isAdmin: boolean
-  isBanned: boolean
   loading: boolean
-  mockMode: boolean
-  setRole: (role: Role) => void
-  login: (email: string, password: string) => Promise<{ success: boolean; redirect?: string; message?: string }>
-  register: (payload: {
-    email: string
-    password: string
-    fullname: string
-    ku_id: string
-    department: string
-    faculty: string
-  }) => Promise<{ success: boolean; message?: string }>
-  logout: () => void
+  isGuest: boolean
+  isIncognito: boolean
+  isAdmin: boolean
+  enterIncognito: () => void
+  exitIncognito: () => void
+  login: (_payload: LoginPayload) => Promise<RegisterResult>
+  logout: () => Promise<void>
+  refreshUser: () => void
+  register: (_payload: RegisterPayload) => Promise<RegisterResult>
+  updateCurrentUserDisplayName: (_displayName: string) => void
 }
 
-const guestProfile: UserProfile = {
+interface LoginPayload {
+  email: string
+  password: string
+}
+
+const guestUser: UserProfile = {
   id: 'guest',
   displayName: 'Guest',
   handle: 'guest',
   role: 'guest',
   status: 'active',
+  avatarUrl: null,
+  coverUrl: null,
 }
 
-const memberProfile: UserProfile = {
-  id: 'ku-20260001',
-  displayName: 'Praewa S.',
-  handle: 'praewa.ku',
-  role: 'member',
-  status: 'active',
+const INCOGNITO_STORAGE_KEY = 'kuboard.incognito'
+
+function readIncognitoState() {
+  try {
+    return window.localStorage.getItem(INCOGNITO_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
 }
 
-const adminProfile: UserProfile = {
-  id: 'admin-0001',
-  displayName: 'KU Admin',
-  handle: 'admin.ku',
-  role: 'admin',
-  status: 'active',
+function writeIncognitoState(value: boolean) {
+  try {
+    if (value) {
+      window.localStorage.setItem(INCOGNITO_STORAGE_KEY, '1')
+    } else {
+      window.localStorage.removeItem(INCOGNITO_STORAGE_KEY)
+    }
+  } catch {
+    // ignore
+  }
 }
 
-const profiles: Record<Role, UserProfile> = {
-  guest: guestProfile,
-  member: memberProfile,
-  admin: adminProfile,
+function toHandle(value: string, fallback: string) {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '.')
+    .replace(/(^[.]+|[.]+$)/g, '')
+
+  return slug || fallback
+}
+
+function withUpdatedDisplayName(user: UserProfile, displayName: string): UserProfile {
+  return {
+    ...user,
+    displayName,
+    handle: toHandle(displayName, user.id.slice(0, 8)),
+  }
+}
+
+function resolveSessionUser(): UserProfile | null {
+  const session = readSupabaseSession()
+  const sessionUser = session?.user
+  const userId = sessionUser?.id
+
+  if (!userId) {
+    return null
+  }
+
+  const emailHandle = sessionUser.email?.split('@')[0]?.toLowerCase()
+  const displayName =
+    sessionUser.user_metadata?.full_name ||
+    sessionUser.user_metadata?.display_name ||
+    sessionUser.user_metadata?.name ||
+    emailHandle ||
+    'KU Member'
+
+  const role = sessionUser.app_metadata?.role === 'admin' ? 'admin' : 'member'
+
+  return {
+    id: userId,
+    displayName,
+    handle: toHandle(displayName, emailHandle || userId.slice(0, 8)),
+    role,
+    status: 'active',
+    avatarUrl: null,
+    coverUrl: null,
+  } satisfies UserProfile
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<UserProfile>(guestProfile)
-  const [loading, setLoading] = useState(false)
+  const [user, setUser] = useState<UserProfile>(guestUser)
+  const [loading, setLoading] = useState(true)
+  const [isIncognito, setIsIncognito] = useState(() => readIncognitoState())
 
-  const setRole = (role: Role) => {
-    if (MOCK_GUEST_MODE) {
-      setUser(guestProfile)
-      return
-    }
-    setUser(profiles[role])
+  const recomputeUser = (nextIncognito: boolean) => {
+    const sessionUser = resolveSessionUser()
+    setUser(nextIncognito ? guestUser : sessionUser ?? guestUser)
+    setLoading(false)
   }
 
-  const login = async (email: string, _password: string) => {
-    setLoading(true)
-    try {
-      if (MOCK_GUEST_MODE) {
-        setUser(guestProfile)
-        return { success: true, redirect: '/' }
-      }
-      const normalized = email.trim().toLowerCase()
-      if (!normalized.endsWith('@ku.ac.th') && !normalized.endsWith('@ku.th')) {
-        return { success: false, message: 'Please use a KU email address (@ku.ac.th).' }
-      }
-      const handle = normalized.split('@')[0]
-      setUser({
-        ...memberProfile,
-        handle,
-        displayName: handle.replace('.', ' ').replace('-', ' '),
-      })
-      return { success: true, redirect: '/' }
-    } finally {
-      setLoading(false)
-    }
+  const refreshUser = () => {
+    recomputeUser(isIncognito)
   }
 
-  const register = async (payload: {
-    email: string
-    password: string
-    fullname: string
-    ku_id: string
-    department: string
-    faculty: string
-  }) => {
-    setLoading(true)
-    try {
-      if (MOCK_GUEST_MODE) {
-        return { success: true }
-      }
-      const normalized = payload.email.trim().toLowerCase()
-      if (!normalized.endsWith('@ku.ac.th') && !normalized.endsWith('@ku.th')) {
-        return { success: false, message: 'กรุณาใช้อีเมล KU (@ku.ac.th)' }
-      }
-      if (payload.password.length < 8) {
-        return { success: false, message: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' }
-      }
-      if (!payload.fullname.trim()) {
-        return { success: false, message: 'กรุณากรอกชื่อ-นามสกุล' }
-      }
-      return { success: true }
-    } finally {
-      setLoading(false)
-    }
+  const enterIncognito = () => {
+    writeIncognitoState(true)
+    setIsIncognito(true)
+    recomputeUser(true)
   }
 
-  const logout = () => setUser(guestProfile)
+  const exitIncognito = () => {
+    writeIncognitoState(false)
+    setIsIncognito(false)
+    recomputeUser(false)
+  }
 
-  const value = useMemo(() => {
-    const isBanned = user.status === 'banned'
-    const isGuest = user.role === 'guest' || isBanned
-    return {
+  useEffect(() => {
+    refreshUser()
+  }, [])
+
+  const value = useMemo<AuthContextValue>(
+    () => ({
       user,
-      isGuest,
-      isMember: user.role === 'member' && !isBanned,
-      isAdmin: user.role === 'admin' && !isBanned,
-      isBanned,
       loading,
-      mockMode: MOCK_GUEST_MODE,
-      setRole,
-      login,
-      register,
-      logout,
-    }
-  }, [loading, user])
+      isGuest: user.role === 'guest',
+      isIncognito,
+      isAdmin: user.role === 'admin',
+      enterIncognito,
+      exitIncognito,
+      login: async (payload) => {
+        setLoading(true)
+        try {
+          const response = await loginWithPassword(serverBase, payload)
+          writeIncognitoState(false)
+          setIsIncognito(false)
+          recomputeUser(false)
+          return {
+            success: true,
+            message: response?.message,
+          }
+        } catch (error) {
+          setLoading(false)
+          return {
+            success: false,
+            message: error instanceof Error ? error.message : 'เข้าสู่ระบบไม่สำเร็จ',
+          }
+        }
+      },
+      logout: async () => {
+        try {
+          await logoutSession(serverBase)
+        } catch {
+          // Fall back to local reset even if the API call fails.
+        }
+        writeIncognitoState(false)
+        setIsIncognito(false)
+        setUser(guestUser)
+        setLoading(false)
+      },
+      refreshUser,
+      updateCurrentUserDisplayName: (displayName) => {
+        setUser((current) => withUpdatedDisplayName(current, displayName))
+      },
+      register: async (payload) => {
+        setLoading(true)
+        try {
+          const response = await registerWithPassword(serverBase, payload)
+          writeIncognitoState(false)
+          setIsIncognito(false)
+          recomputeUser(false)
+          return {
+            success: true,
+            message: response?.message,
+          }
+        } catch (error) {
+          setLoading(false)
+          return {
+            success: false,
+            message: error instanceof Error ? error.message : 'สมัครสมาชิกไม่สำเร็จ',
+          }
+        }
+      },
+    }),
+    [isIncognito, loading, serverBase, user],
+  )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }

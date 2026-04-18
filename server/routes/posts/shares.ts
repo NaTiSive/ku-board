@@ -61,7 +61,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     // สร้าง shareable URL
     const baseUrl = process.env.CLIENT_URL ?? "http://localhost:5173"; // Vite default port
-    const shareUrl = `${baseUrl}/posts/${req.params.postId}`;
+    const shareUrl = `${baseUrl}/post/${req.params.postId}`;
 
     const { count } = await supabase
       .from("shares")

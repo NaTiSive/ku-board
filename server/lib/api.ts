@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import type { Request, Response } from "express";
-import { createServerClient } from "./supabase";
+import { createAdminClient, createServerClient } from "./supabase";
 
 // ─── Response helpers ─────────────────────────────────────────────────────────
 
@@ -32,23 +32,25 @@ export function err(res: Response, message: string, status = 400) {
  * คืน { user, profile, supabase } หรือ null ถ้าไม่ได้ login
  */
 export async function getUser(req: Request, res: Response) {
-  const supabase = createServerClient(req, res);
+  const sessionSupabase = createServerClient(req, res);
 
   // ดึง user จาก session
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = await sessionSupabase.auth.getUser();
 
   if (!user) return null;
 
   // ดึง profile (role, status, display_name)
-  const { data: profile } = await supabase
+  const { data: profile } = await sessionSupabase
     .from("profiles")
     .select("id, display_name, role, status")
     .eq("id", user.id)
     .single();
 
   if (!profile) return null;
+
+  const supabase = profile.role === "admin" ? createAdminClient() : sessionSupabase;
 
   return { user, profile, supabase };
 }
