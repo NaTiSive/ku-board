@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
  
 import { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "../../lib/supabase";
 
 type NotificationInsert = {
   recipientId: string;
@@ -23,12 +24,13 @@ type NotificationInsert = {
 };
 
 async function insertNotification(
-  supabase: SupabaseClient,
+  _supabase: SupabaseClient,
   { recipientId, actorId, type, postId = null, body = null }: NotificationInsert
 ): Promise<void> {
   // Centralize raw notification inserts so every trigger writes the same schema
   // รวมรูปแบบ insert ไว้จุดเดียว เผื่อ schema notifications เปลี่ยนภายหลัง
-  const { error } = await supabase.from("notifications").insert({
+  const admin = createAdminClient();
+  const { error } = await admin.from("notifications").insert({
     recipient_id: recipientId,
     actor_id: actorId,
     type,
