@@ -878,7 +878,14 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text);
-  padding: 0;
+  padding: 6px 8px;
+  border-radius: 999px;
+  text-decoration: none;
+  transition:
+    background-color 0.16s ease,
+    color 0.16s ease,
+    transform 0.16s ease,
+    opacity 0.16s ease;
 }
 
 .action-button svg {
@@ -886,8 +893,25 @@
   height: 16px;
 }
 
+.action-button:not(:disabled) {
+  cursor: pointer;
+}
+
+.action-button:not(:disabled):hover,
+.action-button:not(:disabled):focus-visible {
+  background: #f3f6f4;
+  color: var(--accent-dark);
+  transform: translateY(-1px);
+}
+
+.action-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .action-button.is-active {
   color: var(--accent-dark);
+  background: #edf5ef;
 }
 
 .action-text {

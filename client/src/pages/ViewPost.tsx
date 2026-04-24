@@ -14,6 +14,67 @@ import { fetchPostById } from '../lib/postApi'
 import { serverBase } from '../lib/serverBase'
 import type { Comment, Post } from '../types'
 
+function ViewPostLoadingSkeleton() {
+  return (
+    <section className="page">
+      <div className="feed-layout">
+        <div className="feed-main">
+          <div className="card post-card-skeleton">
+            <div className="post-skeleton-header">
+              <span className="skeleton skeleton-avatar" />
+              <div className="post-skeleton-meta">
+                <span className="skeleton skeleton-line skeleton-line-medium" />
+                <span className="skeleton skeleton-line skeleton-line-short" />
+              </div>
+              <span className="skeleton skeleton-chip" />
+            </div>
+            <span className="skeleton skeleton-line skeleton-line-title" />
+            <span className="skeleton skeleton-line skeleton-line-full" />
+            <span className="skeleton skeleton-line skeleton-line-full" />
+            <span className="skeleton skeleton-line skeleton-line-medium" />
+            <div className="skeleton skeleton-block skeleton-post-image" />
+            <div className="post-skeleton-actions">
+              <span className="skeleton skeleton-chip" />
+              <span className="skeleton skeleton-chip" />
+              <span className="skeleton skeleton-chip" />
+            </div>
+          </div>
+
+          <div className="card">
+            <span className="skeleton skeleton-line skeleton-line-medium" />
+            <div className="side-list" style={{ marginTop: '16px' }}>
+              {Array.from({ length: 3 }, (_, index) => (
+                <div className="follow-tile follow-tile-skeleton" key={index}>
+                  <span className="skeleton skeleton-avatar" />
+                  <div className="follow-tile-copy">
+                    <span className="skeleton skeleton-line skeleton-line-medium" />
+                    <span className="skeleton skeleton-line skeleton-line-full" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <aside className="feed-side">
+          <div className="side-header">Following</div>
+          <div className="side-list side-list-tiles">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div className="follow-tile follow-tile-skeleton" key={index}>
+                <span className="skeleton skeleton-avatar" />
+                <div className="follow-tile-copy">
+                  <span className="skeleton skeleton-line skeleton-line-medium" />
+                  <span className="skeleton skeleton-line skeleton-line-short" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
 export default function ViewPost() {
   const { id } = useParams()
   const [post, setPost] = useState<Post | null>(null)
@@ -62,14 +123,7 @@ export default function ViewPost() {
   }, [id])
 
   if (loading) {
-    return (
-      <section className="page">
-        <div className="card">
-          <h2>Loading post...</h2>
-          <p className="muted">Fetching the latest post details from the API.</p>
-        </div>
-      </section>
-    )
+    return <ViewPostLoadingSkeleton />
   }
 
   if (error) {

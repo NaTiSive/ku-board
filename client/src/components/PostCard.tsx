@@ -61,7 +61,7 @@ function IconMore() {
 }
 
 export default function PostCard({ post, index = 0, showReport = false, showBack = false }: PostCardProps) {
-  const { user, isGuest } = useAuth()
+  const { user, isGuest, isIncognito } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
@@ -207,7 +207,7 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
           </button>
         )}
       </div>
-      {isGuest && <div className="post-note">Guest actions are limited to session only.</div>}
+      {isGuest && !isIncognito && <div className="post-note">Guest actions are limited to session only.</div>}
     </article>
   )
 }
