@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { fetchLikeState, toggleLike } from '../lib/postApi'
 import { serverBase } from '../lib/serverBase'
+import { useAuth } from '../hooks/useAuth'
 
 interface LikeButtonProps {
   postId: string
@@ -26,12 +27,21 @@ export default function LikeButton({
   disabled = false,
   disabledHint,
 }: LikeButtonProps) {
-  const [liked, setLiked] = useState(initiallyLiked)
+  const { isIncognito } = useAuth()
+  const [liked, setLiked] = useState(isIncognito ? false : initiallyLiked)
   const [count, setCount] = useState(initialCount)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
+
+    if (isIncognito) {
+      setLiked(false)
+      setCount(initialCount)
+      return () => {
+        cancelled = true
+      }
+    }
 
     const loadLikeState = async () => {
       try {
@@ -53,7 +63,7 @@ export default function LikeButton({
     return () => {
       cancelled = true
     }
-  }, [initialCount, initiallyLiked, postId])
+  }, [initialCount, initiallyLiked, isIncognito, postId])
 
   const handleToggleLike = async () => {
     if (disabled || submitting) {
