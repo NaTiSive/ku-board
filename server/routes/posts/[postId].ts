@@ -177,7 +177,7 @@ router.delete("/", async (req: Request, res: Response) => {
  
     const { data: existing, error: findErr } = await supabase
       .from("posts")
-      .select("id, author_id, image_url")
+      .select("id, author_id, image_url, title, content")
       .eq("id", req.params.postId)
       .single();
  
@@ -212,7 +212,8 @@ router.delete("/", async (req: Request, res: Response) => {
         reason: reason || null,
       });
 
-      await notifyAdminDeletedPost(supabase, user.id, existing.author_id, reason);
+      const postPreview = (existing.title || existing.content || "").trim().slice(0, 120);
+      await notifyAdminDeletedPost(supabase, user.id, existing.author_id, reason, postPreview || null);
     }
  
     return ok(res, { deleted: true });

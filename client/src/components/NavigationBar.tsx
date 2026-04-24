@@ -1,6 +1,8 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { fetchUnreadNotificationCount } from '../lib/notificationsApi'
+import { serverBase } from '../lib/serverBase'
 import KULogo from '../assets/ku-logo.svg'
 
 type SearchKind = 'posts' | 'hashtag' | 'users'
@@ -121,8 +123,9 @@ function IconUser() {
 }
 
 export default function NavigationBar() {
-  const { enterIncognito, exitIncognito, isAdmin, isGuest, isIncognito, logout } = useAuth()
+  const { enterIncognito, exitIncognito, isAdmin, isGuest, isIncognito, logout, user } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const menuRef = useRef<HTMLDivElement | null>(null)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
@@ -148,6 +151,34 @@ export default function NavigationBar() {
       document.removeEventListener('keydown', handleEscape)
     }
   }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadUnreadCount() {
+      if (isGuest) {
+        setUnreadNotificationCount(0)
+        return
+      }
+
+      try {
+        const count = await fetchUnreadNotificationCount(serverBase)
+        if (!cancelled) {
+          setUnreadNotificationCount(count)
+        }
+      } catch {
+        if (!cancelled) {
+          setUnreadNotificationCount(0)
+        }
+      }
+    }
+
+    void loadUnreadCount()
+
+    return () => {
+      cancelled = true
+    }
+  }, [isGuest, location.pathname, user.id])
 
   const currentSearchText = formatSearchText(searchParams.get('q') ?? '', searchParams.get('type'))
 
@@ -258,8 +289,9 @@ export default function NavigationBar() {
               <NavLink className="icon-button" to="/create" aria-label="Create post">
                 <IconCreate />
               </NavLink>
-              <NavLink className="icon-button" to="/notifications" aria-label="Notifications">
+              <NavLink className="icon-button notification-button" to="/notifications" aria-label="Notifications">
                 <IconBell />
+                {unreadNotificationCount > 0 ? <span className="follow-tile-dot notification-dot" aria-hidden="true" /> : null}
               </NavLink>
               <div className="profile-menu" ref={menuRef}>
                 <button
@@ -287,6 +319,7 @@ export default function NavigationBar() {
                       type="button"
                       onClick={() => {
                         enterIncognito()
+                        navigate('/feed')
                         setMenuOpen(false)
                       }}
                     >

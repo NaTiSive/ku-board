@@ -105,9 +105,7 @@ export function toNotificationListItem(record: NotificationRecord): Notification
       ? `${actorLabel} commented on a post you interacted with: "${trimmedBody}"`
       : `${actorLabel} commented on a post you interacted with`;
   } else if (record.type === "admin_delete_post") {
-    body = trimmedBody
-      ? `${actorLabel} deleted your post. Reason: ${trimmedBody}`
-      : `${actorLabel} deleted your post`;
+    body = trimmedBody || summarizeType(record.type, actorName);
   }
 
   return {

@@ -27,6 +27,10 @@ export interface NotificationsPageData {
   limit: number
 }
 
+export interface NotificationUnreadCountData {
+  unread_count: number
+}
+
 async function readJson<T>(response: Response) {
   const body = (await response.json()) as ApiEnvelope<T>
 
@@ -47,6 +51,15 @@ export async function fetchNotifications(serverBase: string, page = 1, limit = 2
   })
 
   return readJson<NotificationsPageData>(response)
+}
+
+export async function fetchUnreadNotificationCount(serverBase: string): Promise<number> {
+  const response = await fetch(`${serverBase}/api/notifications/unread-count`, {
+    credentials: 'include',
+  })
+
+  const data = await readJson<NotificationUnreadCountData>(response)
+  return data.unread_count ?? 0
 }
 
 export async function markNotificationsRead(serverBase: string, ids: string[]) {

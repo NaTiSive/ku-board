@@ -643,10 +643,22 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow: hidden;
 }
 
 .follow-tile-copy strong {
   font-size: 12px;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.follow-tile-copy .muted {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .follow-tile-dot {
@@ -658,6 +670,15 @@
   border-radius: 50%;
   background: #d93131;
   border: 2px solid #fff;
+}
+
+.notification-button {
+  position: relative;
+}
+
+.notification-dot {
+  top: 1px;
+  right: 1px;
 }
 
 .incognito-banner {

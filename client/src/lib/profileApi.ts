@@ -25,6 +25,7 @@ interface CountRecord {
 
 interface ProfilePostRecord {
   id: string
+  title?: string | null
   content: string
   image_url: string | null
   created_at: string
@@ -83,6 +84,7 @@ function toUserProfile(profile: ProfileApiRecord): UserProfile {
 function toPost(post: ProfilePostRecord, profile: UserProfile): Post {
   return {
     id: post.id,
+    title: post.title ?? undefined,
     author: {
       id: profile.id,
       name: profile.displayName,
@@ -97,6 +99,7 @@ function toPost(post: ProfilePostRecord, profile: UserProfile): Post {
     likes: toCount(post.likes),
     comments: toCount(post.comments),
     shares: 0,
+    likedByMe: false,
   }
 }
 

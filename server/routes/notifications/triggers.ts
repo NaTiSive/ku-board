@@ -234,14 +234,27 @@ export async function notifyAdminDeletedPost(
   supabase: SupabaseClient,
   adminId: string,
   recipientId: string,
-  reason: string
+  reason: string,
+  postPreview?: string | null
 ): Promise<void> {
   try {
+    const trimmedPreview = postPreview?.trim().slice(0, 120) ?? "";
+    const trimmedReason = reason.trim().slice(0, 500);
+    const parts = ["An admin deleted your post"];
+
+    if (trimmedPreview) {
+      parts.push(`"${trimmedPreview}"`);
+    }
+
+    if (trimmedReason) {
+      parts.push(`Reason: ${trimmedReason}`);
+    }
+
     await insertNotification(supabase, {
       recipientId,
       actorId: adminId,
       type: "admin_delete_post",
-      body: reason.trim().slice(0, 500) || null,
+      body: parts.join(". "),
     });
   } catch (e) {
     console.error("[notifyAdminDeletedPost]", e);

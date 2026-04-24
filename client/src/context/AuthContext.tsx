@@ -34,6 +34,10 @@ interface AuthContextValue {
   updateCurrentUserDisplayName: (_displayName: string) => void
 }
 
+interface RecomputeOptions {
+  silent?: boolean
+}
+
 interface LoginPayload {
   email: string
   password: string
@@ -170,11 +174,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isIncognito, setIsIncognito] = useState(() => readIncognitoState())
 
-  const recomputeUser = async (nextIncognito: boolean): Promise<UserProfile> => {
+  const recomputeUser = async (nextIncognito: boolean, options?: RecomputeOptions): Promise<UserProfile> => {
     if (nextIncognito) {
       setUser(guestUser)
       setLoading(false)
       return guestUser
+    }
+
+    if (!options?.silent) {
+      setLoading(true)
     }
 
     const sessionUser = resolveSessionUser()
@@ -210,6 +218,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshUser()
   }, [])
 
+  useEffect(() => {
+    if (loading || isIncognito || user.role === 'guest') {
+      return
+    }
+
+    const refreshSessionStatus = () => {
+      void recomputeUser(false, { silent: true })
+    }
+
+    const intervalId = window.setInterval(refreshSessionStatus, 15000)
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshSessionStatus()
+      }
+    }
+
+    window.addEventListener('focus', refreshSessionStatus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refreshSessionStatus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [isIncognito, loading, user.id, user.role])
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
@@ -225,11 +260,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const response = await loginWithPassword(serverBase, payload)
           writeIncognitoState(false)
           setIsIncognito(false)
-          await recomputeUser(false)
+          const resolvedUser = await recomputeUser(false)
           return {
             success: true,
             message: response?.message,
-            user: await recomputeUser(false),
+            user: resolvedUser,
           }
         } catch (error) {
           setLoading(false)
@@ -261,11 +296,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const response = await registerWithPassword(serverBase, payload)
           writeIncognitoState(false)
           setIsIncognito(false)
-          await recomputeUser(false)
+          const resolvedUser = await recomputeUser(false)
           return {
             success: true,
             message: response?.message,
-            user: await recomputeUser(false),
+            user: resolvedUser,
           }
         } catch (error) {
           setLoading(false)

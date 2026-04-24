@@ -270,6 +270,7 @@ router.get("/:userId/posts", async (req: Request, res: Response) => {
       .select(
         `
         id,
+        title,
         content,
         image_url,
         created_at,
