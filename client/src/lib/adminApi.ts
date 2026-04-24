@@ -12,10 +12,14 @@ interface AdminUserRecord {
   role: Role
   status: 'active' | 'banned'
   created_at: string
+  ban_reason?: string | null
+  banned_at?: string | null
 }
 
 export interface AdminUser extends UserProfile {
   createdAt: string
+  banReason?: string | null
+  bannedAt?: string | null
 }
 
 export interface AdminUsersResponse {
@@ -29,6 +33,8 @@ export interface AdminLogItem {
   id: string
   action_type: string
   target_id: string
+  target_handle?: string | null
+  reason?: string | null
   created_at: string
   admin_name: string
 }
@@ -58,6 +64,8 @@ function toAdminUser(record: AdminUserRecord): AdminUser {
     role: record.role === 'admin' ? 'admin' : 'member',
     status: record.status,
     createdAt: record.created_at,
+    banReason: record.ban_reason ?? null,
+    bannedAt: record.banned_at ?? null,
   }
 }
 
@@ -100,15 +108,16 @@ export async function setUserBanned(
   serverBase: string,
   userId: string,
   banned: boolean,
-): Promise<{ user_id: string; banned: boolean }> {
+  reason?: string,
+): Promise<{ user_id: string; banned: boolean; reason?: string | null }> {
   const response = await fetch(`${serverBase}/api/admin/users/${userId}/ban`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ banned }),
+    body: JSON.stringify({ banned, reason }),
   })
 
-  return readJson<{ user_id: string; banned: boolean }>(response)
+  return readJson<{ user_id: string; banned: boolean; reason?: string | null }>(response)
 }
 
 export async function fetchAdminLogs(
@@ -124,4 +133,3 @@ export async function fetchAdminLogs(
   const response = await fetch(url.toString(), { credentials: 'include', signal })
   return readJson<AdminLogsResponse>(response)
 }
-

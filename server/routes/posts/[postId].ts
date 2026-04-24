@@ -19,6 +19,8 @@ import { Router } from "express";
 import type { Request, Response } from "express";
 import { createServerClient } from "../../lib/supabase";
 import { ok, err, getUser } from "../../lib/api";
+import { syncPostHashtags } from "../../lib/hashtag";
+import { notifyAdminDeletedPost } from "../notifications/triggers";
  
 const router = Router({ mergeParams: true });
  
@@ -63,12 +65,13 @@ router.patch("/", async (req: Request, res: Response) => {
     if (ctx.profile.status === "banned") return err(res, "Account ถูกระงับ", 403);
  
     const { user, supabase } = ctx;
+    const postId = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
  
     // ดึงโพสเดิมเพื่อตรวจสอบเจ้าของ
     const { data: existing, error: findErr } = await supabase
       .from("posts")
       .select("id, author_id, image_url")
-      .eq("id", req.params.postId)
+      .eq("id", postId)
       .single();
  
     if (findErr || !existing) return err(res, "ไม่พบโพสนี้", 404);
@@ -142,7 +145,7 @@ router.patch("/", async (req: Request, res: Response) => {
     const { data: updated, error } = await supabase
       .from("posts")
       .update(updatePayload)
-      .eq("id", req.params.postId)
+      .eq("id", postId)
       .select(
         `id, title, content, image_url, created_at, updated_at,
         profiles!author_id ( id, display_name, avatar_url )`
@@ -150,6 +153,8 @@ router.patch("/", async (req: Request, res: Response) => {
       .single();
  
     if (error) throw error;
+
+    await syncPostHashtags(supabase, postId, updated.title ?? "", updated.content);
  
     return ok(res, updated);
   } catch {
@@ -164,7 +169,11 @@ router.delete("/", async (req: Request, res: Response) => {
     if (!ctx) return err(res, "Unauthorized", 401);
  
     const { user, profile, supabase } = ctx;
+    if (profile.status === "banned") {
+      return err(res, "Account ถูกระงับ", 403);
+    }
     const isAdmin = profile.role === "admin";
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
  
     const { data: existing, error: findErr } = await supabase
       .from("posts")
@@ -185,6 +194,8 @@ router.delete("/", async (req: Request, res: Response) => {
     }
  
     // ลบโพส (CASCADE ลบ likes/comments ใน DB อัตโนมัติ)
+    await supabase.from("post_hashtags").delete().eq("post_id", req.params.postId);
+
     const { error } = await supabase
       .from("posts")
       .delete()
@@ -198,7 +209,10 @@ router.delete("/", async (req: Request, res: Response) => {
         admin_id: user.id,
         action_type: "delete_post",
         target_id: req.params.postId,
+        reason: reason || null,
       });
+
+      await notifyAdminDeletedPost(supabase, user.id, existing.author_id, reason);
     }
  
     return ok(res, { deleted: true });

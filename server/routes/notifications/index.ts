@@ -34,7 +34,8 @@ router.get("/", async (req: Request, res: Response) => {
         post_id,
         profiles!actor_id (
           id,
-          display_name
+          display_name,
+          avatar_url
         ),
         posts (
           id,

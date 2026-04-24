@@ -14,6 +14,10 @@ import { createServerClient } from "../lib/supabase";
 import { ok, err, getPagination } from "../lib/api";
 
 const router = Router();
+const POST_SELECT = `id, title, content, image_url, created_at,
+  profiles!author_id ( id, display_name, avatar_url ),
+  likes ( count ),
+  comments ( count )`;
 
 function sanitizeQuery(raw: unknown): string {
   return String(raw ?? "").trim().slice(0, 100);
@@ -39,62 +43,27 @@ function normalizeError(error: unknown) {
   };
 }
 
-function isMissingIncognitoColumn(error: unknown) {
-  if (!error || typeof error !== "object") return false;
-
-  const code = "code" in error ? (error as { code?: unknown }).code : null;
-  const message = "message" in error ? String((error as { message?: unknown }).message ?? "") : "";
-
-  return code === "42703" && message.includes("is_incognito");
-}
-
-function buildPostSelect(includeIncognito: boolean) {
-  return `id, title, content, image_url, ${includeIncognito ? "is_incognito, " : ""}created_at,
-    profiles!author_id ( id, display_name, avatar_url ),
-    likes ( count ),
-    comments ( count )`;
-}
-
 async function searchPosts(
   supabase: ReturnType<typeof createServerClient>,
   rawQ: string,
   from: number,
   to: number,
 ) {
-  const runQuery = async (useFullText: boolean, includeIncognito: boolean) => {
-    let query = supabase
-      .from("posts")
-      .select(buildPostSelect(includeIncognito), { count: "exact" })
-      .order("created_at", { ascending: false })
-      .range(from, to);
+  const fullTextResult = await supabase
+    .from("posts")
+    .select(POST_SELECT, { count: "exact" })
+    .textSearch("search_vector", rawQ, { type: "plain", config: "simple" })
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
-    query = useFullText
-      ? query.textSearch("search_vector", rawQ, { type: "plain", config: "simple" })
-      : query.or(`title.ilike.%${rawQ}%,content.ilike.%${rawQ}%`);
+  if (!fullTextResult.error) return fullTextResult;
 
-    if (includeIncognito) {
-      query = query.eq("is_incognito", false);
-    }
-
-    return query;
-  };
-
-  let result = await runQuery(true, true);
-  if (!result.error) return result;
-
-  if (isMissingIncognitoColumn(result.error)) {
-    result = await runQuery(true, false);
-    if (!result.error) return result;
-  }
-
-  result = await runQuery(false, !isMissingIncognitoColumn(result.error));
-  if (!result.error) return result;
-
-  if (isMissingIncognitoColumn(result.error)) {
-    result = await runQuery(false, false);
-  }
-
-  return result;
+  return supabase
+    .from("posts")
+    .select(POST_SELECT, { count: "exact" })
+    .or(`title.ilike.%${rawQ}%,content.ilike.%${rawQ}%`)
+    .order("created_at", { ascending: false })
+    .range(from, to);
 }
 
 async function searchHashtags(
@@ -113,32 +82,17 @@ async function searchHashtags(
     return { hashtag: null, rows: [], count: 0, error: null };
   }
 
-  const runQuery = async (includeIncognito: boolean) => {
-    const postsSelect = `posts!inner (
-      id, title, content, image_url, ${includeIncognito ? "is_incognito, " : ""}created_at,
-      profiles!author_id ( id, display_name, avatar_url ),
-      likes ( count ),
-      comments ( count )
-    )`;
-
-    let query = supabase
-      .from("post_hashtags")
-      .select(postsSelect, { count: "exact" })
-      .eq("hashtag_id", hashtag.id)
-      .order("created_at", { referencedTable: "posts", ascending: false })
-      .range(from, to);
-
-    if (includeIncognito) {
-      query = query.eq("posts.is_incognito", false);
-    }
-
-    return query;
-  };
-
-  let result = await runQuery(true);
-  if (result.error && isMissingIncognitoColumn(result.error)) {
-    result = await runQuery(false);
-  }
+  const result = await supabase
+    .from("post_hashtags")
+    .select(
+      `posts!inner (
+        ${POST_SELECT}
+      )`,
+      { count: "exact" },
+    )
+    .eq("hashtag_id", hashtag.id)
+    .order("created_at", { referencedTable: "posts", ascending: false })
+    .range(from, to);
 
   return {
     hashtag,

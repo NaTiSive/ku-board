@@ -174,7 +174,7 @@ export async function toggleLike(serverBase: string, postId: string): Promise<Li
 export async function createComment(
   serverBase: string,
   postId: string,
-  payload: { content: string; guest_name?: string },
+  payload: { content: string; guest_name?: string; incognito?: boolean },
 ): Promise<Comment> {
   const response = await fetch(`${serverBase}/api/posts/${postId}/comments`, {
     method: 'POST',
@@ -263,10 +263,14 @@ export async function updatePost(
   }
 }
 
-export async function deletePost(serverBase: string, postId: string): Promise<void> {
+export async function deletePost(serverBase: string, postId: string, reason?: string): Promise<void> {
   const response = await fetch(`${serverBase}/api/posts/${postId}`, {
     method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
     credentials: 'include',
+    body: JSON.stringify({ reason }),
   })
 
   const body = (await response.json()) as ApiEnvelope<unknown>

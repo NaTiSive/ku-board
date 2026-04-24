@@ -6,9 +6,10 @@
 
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import KULogo from '../assets/ku-logo.svg'
+import { grantGuestAccess } from '../lib/guestAccess'
 import { serverBase } from '../lib/serverBase'
 
 function IconUser() {
@@ -58,12 +59,14 @@ export default function Login() {
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [redirecting, setRedirecting] = useState(false)
-  const { loading, login, refreshUser } = useAuth()
+  const { loading, login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirectTarget = searchParams.get('redirect')?.startsWith('/') ? searchParams.get('redirect')! : '/feed'
 
   const startOAuth = () => {
     setRedirecting(true)
-    window.location.href = `${serverBase}/api/auth/google?redirect=/feed`
+    window.location.href = `${serverBase}/api/auth/google?redirect=${encodeURIComponent(redirectTarget)}`
   }
 
   const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
@@ -84,8 +87,7 @@ export default function Login() {
       return
     }
 
-    refreshUser()
-    navigate('/feed')
+    navigate(result.user?.status === 'banned' ? '/banned' : redirectTarget)
   }
 
   return (
@@ -154,7 +156,14 @@ export default function Login() {
           </button>
 
           <div className="login-alt-actions">
-            <button className="button button-outline login-action-button" type="button" onClick={() => navigate('/feed')}>
+            <button
+              className="button button-outline login-action-button"
+              type="button"
+              onClick={() => {
+                grantGuestAccess()
+                navigate(redirectTarget)
+              }}
+            >
               Continue as guest
             </button>
 

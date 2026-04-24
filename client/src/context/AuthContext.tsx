@@ -4,6 +4,8 @@ import type { UserProfile } from '../types'
 import { loginWithPassword, logoutSession, registerWithPassword } from '../lib/authApi'
 import { serverBase } from '../lib/serverBase'
 import { readSupabaseSession } from '../lib/supabaseSession'
+import { clearGuestAccess } from '../lib/guestAccess'
+import type { Role } from '../types'
 
 interface RegisterPayload {
   email: string
@@ -14,6 +16,7 @@ interface RegisterPayload {
 interface RegisterResult {
   success: boolean
   message?: string
+  user?: UserProfile
 }
 
 interface AuthContextValue {
@@ -34,6 +37,21 @@ interface AuthContextValue {
 interface LoginPayload {
   email: string
   password: string
+}
+
+interface ApiEnvelope<T> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+interface ProfileSnapshot {
+  id: string
+  display_name: string
+  role: string
+  status?: 'active' | 'banned'
+  avatar_url?: string | null
+  cover_url?: string | null
 }
 
 const guestUser: UserProfile = {
@@ -86,6 +104,10 @@ function withUpdatedDisplayName(user: UserProfile, displayName: string): UserPro
   }
 }
 
+function normalizeRole(role?: string): Role {
+  return role === 'admin' ? 'admin' : 'member'
+}
+
 function resolveSessionUser(): UserProfile | null {
   const session = readSupabaseSession()
   const sessionUser = session?.user
@@ -103,7 +125,7 @@ function resolveSessionUser(): UserProfile | null {
     emailHandle ||
     'KU Member'
 
-  const role = sessionUser.app_metadata?.role === 'admin' ? 'admin' : 'member'
+  const role = normalizeRole(sessionUser.app_metadata?.role)
 
   return {
     id: userId,
@@ -116,6 +138,31 @@ function resolveSessionUser(): UserProfile | null {
   } satisfies UserProfile
 }
 
+async function resolveUserFromProfile(baseUser: UserProfile): Promise<UserProfile> {
+  try {
+    const response = await fetch(`${serverBase}/api/profile/${baseUser.id}`, {
+      credentials: 'include',
+    })
+
+    const body = (await response.json()) as ApiEnvelope<ProfileSnapshot>
+    if (!response.ok || !body.success || !body.data) {
+      return baseUser
+    }
+
+    return {
+      ...baseUser,
+      displayName: body.data.display_name || baseUser.displayName,
+      handle: toHandle(body.data.display_name || baseUser.displayName, baseUser.id.slice(0, 8)),
+      role: normalizeRole(body.data.role),
+      status: body.data.status ?? baseUser.status,
+      avatarUrl: body.data.avatar_url ?? null,
+      coverUrl: body.data.cover_url ?? null,
+    }
+  } catch {
+    return baseUser
+  }
+}
+
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -123,26 +170,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [isIncognito, setIsIncognito] = useState(() => readIncognitoState())
 
-  const recomputeUser = (nextIncognito: boolean) => {
+  const recomputeUser = async (nextIncognito: boolean): Promise<UserProfile> => {
+    if (nextIncognito) {
+      setUser(guestUser)
+      setLoading(false)
+      return guestUser
+    }
+
     const sessionUser = resolveSessionUser()
-    setUser(nextIncognito ? guestUser : sessionUser ?? guestUser)
+    if (!sessionUser) {
+      setUser(guestUser)
+      setLoading(false)
+      return guestUser
+    }
+
+    const resolvedUser = await resolveUserFromProfile(sessionUser)
+    setUser(resolvedUser)
     setLoading(false)
+    return resolvedUser
   }
 
   const refreshUser = () => {
-    recomputeUser(isIncognito)
+    void recomputeUser(isIncognito)
   }
 
   const enterIncognito = () => {
     writeIncognitoState(true)
     setIsIncognito(true)
-    recomputeUser(true)
+    void recomputeUser(true)
   }
 
   const exitIncognito = () => {
     writeIncognitoState(false)
     setIsIncognito(false)
-    recomputeUser(false)
+    void recomputeUser(false)
   }
 
   useEffect(() => {
@@ -164,10 +225,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const response = await loginWithPassword(serverBase, payload)
           writeIncognitoState(false)
           setIsIncognito(false)
-          recomputeUser(false)
+          await recomputeUser(false)
           return {
             success: true,
             message: response?.message,
+            user: await recomputeUser(false),
           }
         } catch (error) {
           setLoading(false)
@@ -183,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch {
           // Fall back to local reset even if the API call fails.
         }
+        clearGuestAccess()
         writeIncognitoState(false)
         setIsIncognito(false)
         setUser(guestUser)
@@ -198,10 +261,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const response = await registerWithPassword(serverBase, payload)
           writeIncognitoState(false)
           setIsIncognito(false)
-          recomputeUser(false)
+          await recomputeUser(false)
           return {
             success: true,
             message: response?.message,
+            user: await recomputeUser(false),
           }
         } catch (error) {
           setLoading(false)

@@ -7,9 +7,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import Avatar from '../components/Avatar'
 import PostCard from '../components/PostCard'
 import RecentUpdatesSidebar from '../components/RecentUpdatesSidebar'
 import { useAuth } from '../hooks/useAuth'
+import {
+  fetchFollowers,
+  fetchFollowing,
+  fetchFollowStatus,
+  followUser,
+  unfollowUser,
+  type FollowUser,
+} from '../lib/followsApi'
 import { fetchProfilePageData, updateProfileDisplayName, updateProfileImages } from '../lib/profileApi'
 import { serverBase } from '../lib/serverBase'
 import type { Post, UserProfile } from '../types'
@@ -69,6 +78,78 @@ function IconCamera() {
   )
 }
 
+function ProfileLoadingSkeleton() {
+  return (
+    <section className="page">
+      <div className="feed-layout">
+        <div className="feed-main">
+          <div className="card profile-frame profile-skeleton-card">
+            <div className="profile-cover profile-cover-skeleton">
+              <div className="cover-controls">
+                <span className="skeleton skeleton-circle-button" />
+                <span className="skeleton skeleton-circle-button" />
+              </div>
+            </div>
+
+            <div className="profile-row">
+              <div className="profile-avatar profile-avatar-skeleton">
+                <span className="skeleton skeleton-avatar skeleton-avatar-large" />
+              </div>
+
+              <div className="profile-info">
+                <div className="profile-name-row">
+                  <span className="skeleton skeleton-line skeleton-line-title" />
+                </div>
+                <span className="skeleton skeleton-line skeleton-line-short" />
+                <span className="skeleton skeleton-line skeleton-line-medium" />
+                <div className="profile-social-row">
+                  <span className="skeleton skeleton-chip skeleton-chip-wide" />
+                  <span className="skeleton skeleton-chip skeleton-chip-wide" />
+                </div>
+              </div>
+
+              <div className="profile-actions">
+                <span className="skeleton skeleton-button" />
+              </div>
+            </div>
+          </div>
+
+          {Array.from({ length: 2 }, (_, index) => (
+            <div className="card post-card-skeleton" key={index}>
+              <div className="post-skeleton-header">
+                <span className="skeleton skeleton-avatar" />
+                <div className="post-skeleton-meta">
+                  <span className="skeleton skeleton-line skeleton-line-medium" />
+                  <span className="skeleton skeleton-line skeleton-line-short" />
+                </div>
+                <span className="skeleton skeleton-chip" />
+              </div>
+              <span className="skeleton skeleton-line skeleton-line-title" />
+              <span className="skeleton skeleton-line skeleton-line-full" />
+              <span className="skeleton skeleton-line skeleton-line-medium" />
+              <div className="skeleton skeleton-block skeleton-post-image" />
+            </div>
+          ))}
+        </div>
+        <aside className="feed-side">
+          <div className="side-header">Following</div>
+          <div className="side-list side-list-tiles">
+            {Array.from({ length: 4 }, (_, index) => (
+              <div className="follow-tile follow-tile-skeleton" key={index}>
+                <span className="skeleton skeleton-avatar" />
+                <div className="follow-tile-copy">
+                  <span className="skeleton skeleton-line skeleton-line-medium" />
+                  <span className="skeleton skeleton-line skeleton-line-short" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
 export default function Profile() {
   const navigate = useNavigate()
   const { user, isGuest, loading: authLoading, updateCurrentUserDisplayName } = useAuth()
@@ -80,9 +161,15 @@ export default function Profile() {
   const [postCount, setPostCount] = useState(0)
   const [followerCount, setFollowerCount] = useState(0)
   const [followingCount, setFollowingCount] = useState(0)
+  const [followers, setFollowers] = useState<FollowUser[]>([])
+  const [followingUsers, setFollowingUsers] = useState<FollowUser[]>([])
+  const [connectionsOpen, setConnectionsOpen] = useState<'followers' | 'following' | null>(null)
   const [joinedAt, setJoinedAt] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+  const [isFollowing, setIsFollowing] = useState(false)
+  const [followLoading, setFollowLoading] = useState(false)
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0)
 
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -154,7 +241,12 @@ export default function Profile() {
       setError('')
 
       try {
-        const data = await fetchProfilePageData(serverBase, targetUserId)
+        const [data, followerList, followingList, followStatus] = await Promise.all([
+          fetchProfilePageData(serverBase, targetUserId),
+          fetchFollowers(serverBase, targetUserId),
+          fetchFollowing(serverBase, targetUserId),
+          !isGuest && targetUserId !== user.id ? fetchFollowStatus(serverBase, targetUserId) : Promise.resolve(false),
+        ])
         if (cancelled) {
           return
         }
@@ -164,8 +256,11 @@ export default function Profile() {
         setPostCount(data.postCount)
         setFollowerCount(data.followerCount)
         setFollowingCount(data.followingCount)
+        setFollowers(followerList)
+        setFollowingUsers(followingList)
         setJoinedAt(data.joinedAt)
         setDisplayNameDraft(data.profile.displayName)
+        setIsFollowing(followStatus)
       } catch (loadError) {
         if (!cancelled) {
           setError(loadError instanceof Error ? loadError.message : 'Could not load profile.')
@@ -182,17 +277,48 @@ export default function Profile() {
     return () => {
       cancelled = true
     }
-  }, [authLoading, targetUserId, serverBase])
+  }, [authLoading, isGuest, serverBase, targetUserId, user.id])
+
+  const handleFollowToggle = async () => {
+    if (!targetUserId || isGuest || isOwnProfile || followLoading) {
+      return
+    }
+
+    setFollowLoading(true)
+    setProfileSaveError('')
+
+    try {
+      if (isFollowing) {
+        await unfollowUser(serverBase, targetUserId)
+        setIsFollowing(false)
+        setFollowerCount((current) => Math.max(0, current - 1))
+        setFollowers((current) => current.filter((item) => item.id !== user.id))
+        setSidebarRefreshKey((current) => current + 1)
+      } else {
+        await followUser(serverBase, targetUserId)
+        setIsFollowing(true)
+        setFollowerCount((current) => current + 1)
+        setFollowers((current) => [
+          {
+            id: user.id,
+            displayName: user.displayName,
+            handle: user.handle,
+            avatarUrl: user.avatarUrl ?? null,
+            createdAt: new Date().toISOString(),
+          },
+          ...current,
+        ])
+        setSidebarRefreshKey((current) => current + 1)
+      }
+    } catch (followError) {
+      setProfileSaveError(followError instanceof Error ? followError.message : 'Could not update follow status.')
+    } finally {
+      setFollowLoading(false)
+    }
+  }
 
   if (loading || authLoading) {
-    return (
-      <section className="page">
-        <div className="card">
-          <h2>Loading profile...</h2>
-          <p className="muted">Fetching live profile data from the API.</p>
-        </div>
-      </section>
-    )
+    return <ProfileLoadingSkeleton />
   }
 
   if (error) {
@@ -377,16 +503,6 @@ export default function Profile() {
                         <button className="menu-item" type="button" onClick={startEditing}>
                           Edit Profile
                         </button>
-                        <button
-                          className="menu-item"
-                          type="button"
-                          onClick={() => {
-                            setProfileMenuOpen(false)
-                            navigate('/settings')
-                          }}
-                        >
-                          Settings
-                        </button>
                       </div>
                     )}
                   </div>
@@ -453,17 +569,23 @@ export default function Profile() {
                 <span className="muted">
                   {postCount} posts · Joined {joinedLabel}
                 </span>
-                <span className="muted">
-                  {followerCount} followers · {followingCount} following
-                </span>
+                <div className="profile-social-row">
+                  <button className="profile-stat-button" type="button" onClick={() => setConnectionsOpen('followers')}>
+                    {followerCount} followers
+                  </button>
+                  <span className="muted">·</span>
+                  <button className="profile-stat-button" type="button" onClick={() => setConnectionsOpen('following')}>
+                    {followingCount} following
+                  </button>
+                </div>
               </div>
 
               <div className="profile-actions">
                 {isOwnProfile ? (
                   null
                 ) : (
-                  <button className="button button-outline" type="button" disabled>
-                    Follow
+                  <button className="button button-outline" type="button" onClick={handleFollowToggle} disabled={isGuest || followLoading}>
+                    {followLoading ? 'Updating...' : isFollowing ? 'Following' : 'Follow'}
                   </button>
                 )}
               </div>
@@ -493,8 +615,51 @@ export default function Profile() {
             </div>
           )}
         </div>
-        <RecentUpdatesSidebar />
+        <RecentUpdatesSidebar refreshKey={sidebarRefreshKey} />
       </div>
+      {connectionsOpen && (
+        <div className="image-cropper-overlay" role="dialog" aria-modal="true" aria-label={connectionsOpen}>
+          <div className="admin-log-modal">
+            <div className="admin-log-modal-header">
+              <div>
+                <h3>{connectionsOpen === 'followers' ? 'Followers' : 'Following'}</h3>
+                <p className="muted">
+                  {connectionsOpen === 'followers'
+                    ? 'People who follow this account.'
+                    : 'People this account is following.'}
+                </p>
+              </div>
+              <button className="icon-button" type="button" aria-label="Close list" onClick={() => setConnectionsOpen(null)}>
+                x
+              </button>
+            </div>
+            <div className="admin-log-modal-body">
+              <div className="connection-list">
+                {(connectionsOpen === 'followers' ? followers : followingUsers).map((item) => (
+                  <button
+                    className="connection-item"
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      setConnectionsOpen(null)
+                      navigate(`/profile/${item.id}`)
+                    }}
+                  >
+                    <Avatar name={item.displayName} imageUrl={item.avatarUrl} />
+                    <div className="connection-copy">
+                      <strong>{item.displayName}</strong>
+                      <span className="muted">@{item.handle}</span>
+                    </div>
+                  </button>
+                ))}
+                {(connectionsOpen === 'followers' ? followers : followingUsers).length === 0 && (
+                  <p className="muted">No users to show yet.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <ImageCropPopup
         open={!!cropTarget}

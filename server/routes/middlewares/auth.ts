@@ -10,7 +10,7 @@ import type { NextFunction, Request, Response } from "express";
 import { createServerClient } from "../../lib/supabase";
 import { isAllowedKUEmail } from "../../lib/supabaseAuth";
 
-export type UserRole = "guest" | "ku_member" | "admin";
+export type UserRole = "guest" | "member" | "admin";
 
 declare global {
   namespace Express {
@@ -27,7 +27,7 @@ declare global {
 
 const ROLE_RANK: Record<UserRole, number> = {
   guest: 0,
-  ku_member: 1,
+  member: 1,
   admin: 2,
 };
 
@@ -36,18 +36,18 @@ async function fetchUserRole(
   userId: string
 ): Promise<{ role: UserRole; isBanned: boolean }> {
   const { data } = await supabase
-    .from("user_roles")
-    .select("role, is_banned")
-    .eq("user_id", userId)
+    .from("profiles")
+    .select("role, status")
+    .eq("id", userId)
     .single();
 
   if (!data) {
-    return { role: "ku_member", isBanned: false };
+    return { role: "member", isBanned: false };
   }
 
   return {
-    role: data.role as UserRole,
-    isBanned: data.is_banned ?? false,
+    role: data.role === "admin" ? "admin" : "member",
+    isBanned: data.status === "banned",
   };
 }
 
@@ -126,5 +126,5 @@ export function requireRole(minRole: UserRole) {
   };
 }
 
-export const requireKUMember = requireRole("ku_member");
+export const requireKUMember = requireRole("member");
 export const requireAdmin = requireRole("admin");

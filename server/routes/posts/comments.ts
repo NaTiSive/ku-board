@@ -52,13 +52,14 @@ router.post("/", async (req: Request, res: Response) => {
  
     const content   = (req.body?.content    ?? "").trim();
     const guestName = (req.body?.guest_name ?? "").trim();
+    const incognito = req.body?.incognito === true;
  
     // Validate content
     if (!content) return err(res, "กรุณากรอกคอมเมนต์", 422);
     if (content.length > 1000) return err(res, "คอมเมนต์ยาวเกิน 1000 ตัวอักษร", 422);
  
     // Guest ต้องส่ง guest_name มาด้วย
-    if (!ctx && !guestName) {
+    if ((!ctx || incognito) && !guestName) {
       return err(res, "กรุณาระบุชื่อสำหรับการแสดงความคิดเห็น", 422);
     }
  
@@ -77,7 +78,7 @@ router.post("/", async (req: Request, res: Response) => {
     if (!post) return err(res, "ไม่พบโพสนี้", 404);
  
     // สร้าง record ต่างกันระหว่าง KU Member กับ Guest
-    const insertData = ctx
+    const insertData = ctx && !incognito
       ? { post_id: req.params.postId, author_id: ctx.user.id, content }
       : { post_id: req.params.postId, author_id: null, guest_name: guestName, content };
  
@@ -93,8 +94,8 @@ router.post("/", async (req: Request, res: Response) => {
     if (error) throw error;
  
     // [ใหม่] แจ้งเตือนหลัง comment สำเร็จ — fire-and-forget
-    // KU Member เท่านั้น, Guest ไม่ trigger
-    if (ctx) {
+    // KU Member เท่านั้น, Guest / Incognito ไม่ trigger
+    if (ctx && !incognito) {
       const postId = Array.isArray(req.params.postId) ? req.params.postId[0] : req.params.postId;
       if (postId) {
         notifyComment(supabase, postId, ctx.user.id, content);

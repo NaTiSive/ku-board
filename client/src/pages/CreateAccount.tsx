@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import KULogo from '../assets/ku-logo.svg'
 
@@ -25,7 +25,9 @@ export default function CreateAccount() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { register, loading } = useAuth()
+  const redirectTarget = searchParams.get('redirect')?.startsWith('/') ? searchParams.get('redirect')! : '/feed'
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     setForm((prev) => ({ ...prev, [event.target.name]: event.target.value }))
@@ -49,7 +51,7 @@ export default function CreateAccount() {
     const result = await register(form)
     if (result.success) {
       setSuccess(result.message || 'Account created. Redirecting to login...')
-      setTimeout(() => navigate('/login'), 1500)
+      setTimeout(() => navigate(`/login?redirect=${encodeURIComponent(redirectTarget)}`), 1500)
       return
     }
 
@@ -127,7 +129,7 @@ export default function CreateAccount() {
 
         <div className="login-help">
           Already have an account?
-          <span onClick={() => navigate('/login')}>Login</span>
+          <span onClick={() => navigate(`/login?redirect=${encodeURIComponent(redirectTarget)}`)}>Login</span>
         </div>
       </div>
 

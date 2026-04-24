@@ -13,13 +13,24 @@ interface CommentSectionProps {
 }
 
 export default function CommentSection({ postId, initialComments, onCommentAdded }: CommentSectionProps) {
-  const { isGuest, user } = useAuth()
+  const { isGuest, isIncognito, user } = useAuth()
   const [comments, setComments] = useState<Comment[]>(initialComments)
   const [value, setValue] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
-  const label = useMemo(() => (isGuest ? 'Anonymous' : user.displayName), [isGuest, user.displayName])
+  const isAnonymousMode = isGuest || isIncognito
+  const label = useMemo(() => {
+    if (isIncognito) {
+      return 'Incognito User'
+    }
+
+    if (isGuest) {
+      return 'Anonymous'
+    }
+
+    return user.displayName
+  }, [isGuest, isIncognito, user.displayName])
 
   useEffect(() => {
     setComments(initialComments)
@@ -38,7 +49,8 @@ export default function CommentSection({ postId, initialComments, onCommentAdded
     try {
       const comment = await createComment(serverBase, postId, {
         content,
-        ...(isGuest ? { guest_name: label } : {}),
+        ...(isAnonymousMode ? { guest_name: label } : {}),
+        ...(isIncognito ? { incognito: true } : {}),
       })
 
       setComments((prev) => [...prev, comment])
@@ -57,9 +69,10 @@ export default function CommentSection({ postId, initialComments, onCommentAdded
         <span className="icon-circle">C</span>
         <h3>Comments</h3>
       </div>
-      {isGuest && (
+      {isAnonymousMode && (
         <div className="info-banner">
-          Guest comments appear as <strong>Anonymous</strong>.
+          {isIncognito ? 'Incognito comments appear as ' : 'Guest comments appear as '}
+          <strong>{label}</strong>.
         </div>
       )}
       <div className="comment-input">

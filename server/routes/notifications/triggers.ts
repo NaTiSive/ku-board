@@ -13,6 +13,32 @@
 // ─────────────────────────────────────────────────────────────────────────────
  
 import { SupabaseClient } from "@supabase/supabase-js";
+
+type NotificationInsert = {
+  recipientId: string;
+  actorId: string | null;
+  type: string;
+  postId?: string | null;
+  body?: string | null;
+};
+
+async function insertNotification(
+  supabase: SupabaseClient,
+  { recipientId, actorId, type, postId = null, body = null }: NotificationInsert
+): Promise<void> {
+  // Centralize raw notification inserts so every trigger writes the same schema
+  // รวมรูปแบบ insert ไว้จุดเดียว เผื่อ schema notifications เปลี่ยนภายหลัง
+  const { error } = await supabase.from("notifications").insert({
+    recipient_id: recipientId,
+    actor_id: actorId,
+    type,
+    post_id: postId,
+    body,
+    is_read: false,
+  });
+
+  if (error) throw error;
+}
  
 // ─── Like Notification ────────────────────────────────────────────────────────
  
@@ -33,7 +59,7 @@ export async function notifyLike(
     // ดึง author ของโพสที่ถูก like
     const { data: post } = await supabase
       .from("posts")
-      .select("author_id, content")
+      .select("author_id, content, title")
       .eq("id", postId)
       .single();
  
@@ -42,13 +68,13 @@ export async function notifyLike(
     // ไม่แจ้งตัวเอง
     if (post.author_id === likerId) return;
  
-    // สร้าง notification ผ่าน DB function (จัดการ duplicate ให้อัตโนมัติ)
-    await supabase.rpc("create_notification", {
-      p_recipient_id: post.author_id,
-      p_actor_id:     likerId,
-      p_type:         "like",
-      p_post_id:      postId,
-      p_body:         null,
+    const postPreview = (post.title || post.content || "").trim().slice(0, 80);
+    await insertNotification(supabase, {
+      recipientId: post.author_id,
+      actorId: likerId,
+      type: "like",
+      postId,
+      body: postPreview || null,
     });
   } catch (e) {
     // notification fail ไม่กระทบ main action
@@ -75,8 +101,9 @@ export async function notifyComment(
   commenterId: string | null,
   commentBody: string
 ): Promise<void> {
-  if (!commenterId) return; // Guest comment ไม่ trigger notification
- 
+  // Old RLS behavior: guest / incognito comments do not create notifications
+  if (!commenterId) return; // Guest / incognito comment ไม่ trigger notification
+
   try {
     // ดึงข้อมูลโพส
     const { data: post } = await supabase
@@ -87,16 +114,16 @@ export async function notifyComment(
  
     if (!post) return;
  
-    const preview = commentBody.slice(0, 100); // preview 100 ตัวแรก
+    const preview = commentBody.trim().slice(0, 100); // preview 100 ตัวแรก
  
     // 1. แจ้งเจ้าของโพส
     if (post.author_id !== commenterId) {
-      await supabase.rpc("create_notification", {
-        p_recipient_id: post.author_id,
-        p_actor_id:     commenterId,
-        p_type:         "comment",
-        p_post_id:      postId,
-        p_body:         preview,
+      await insertNotification(supabase, {
+        recipientId: post.author_id,
+        actorId: commenterId,
+        type: "comment",
+        postId,
+        body: preview || null,
       });
     }
  
@@ -123,12 +150,12 @@ export async function notifyComment(
  
     // แจ้ง post_activity ให้ทุกคนที่ interact ไว้
     const notifyPromises = [...interactedIds].map((uid) =>
-      supabase.rpc("create_notification", {
-        p_recipient_id: uid,
-        p_actor_id:     commenterId,
-        p_type:         "post_activity",
-        p_post_id:      postId,
-        p_body:         preview,
+      insertNotification(supabase, {
+        recipientId: uid,
+        actorId: commenterId,
+        type: "post_activity",
+        postId,
+        body: preview || null,
       })
     );
     await Promise.allSettled(notifyPromises); // allSettled = ไม่ throw ถ้าบางอันล้มเหลว
@@ -152,12 +179,10 @@ export async function notifyFollow(
   followingId: string
 ): Promise<void> {
   try {
-    await supabase.rpc("create_notification", {
-      p_recipient_id: followingId,
-      p_actor_id:     followerId,
-      p_type:         "follow",
-      p_post_id:      null,
-      p_body:         null,
+    await insertNotification(supabase, {
+      recipientId: followingId,
+      actorId: followerId,
+      type: "follow",
     });
   } catch (e) {
     console.error("[notifyFollow]", e);
@@ -190,16 +215,33 @@ export async function notifyNewPost(
  
     // แจ้งทุก follower พร้อมกัน (allSettled = ไม่หยุดถ้าบางอันล้มเหลว)
     const promises = followers.map((f) =>
-      supabase.rpc("create_notification", {
-        p_recipient_id: f.follower_id,
-        p_actor_id:     authorId,
-        p_type:         "new_post",
-        p_post_id:      postId,
-        p_body:         null,
+      insertNotification(supabase, {
+        recipientId: f.follower_id,
+        actorId: authorId,
+        type: "new_post",
+        postId,
       })
     );
     await Promise.allSettled(promises);
   } catch (e) {
     console.error("[notifyNewPost]", e);
+  }
+}
+
+export async function notifyAdminDeletedPost(
+  supabase: SupabaseClient,
+  adminId: string,
+  recipientId: string,
+  reason: string
+): Promise<void> {
+  try {
+    await insertNotification(supabase, {
+      recipientId,
+      actorId: adminId,
+      type: "admin_delete_post",
+      body: reason.trim().slice(0, 500) || null,
+    });
+  } catch (e) {
+    console.error("[notifyAdminDeletedPost]", e);
   }
 }

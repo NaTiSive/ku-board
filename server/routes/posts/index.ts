@@ -78,7 +78,7 @@ router.post("/", async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    void syncPostHashtags(supabase, post.id, title, content);
+    await syncPostHashtags(supabase, post.id, title, content);
     void notifyNewPost(supabase, post.id, user.id);
 
     return ok(res, post, 201);

@@ -77,19 +77,6 @@ async function ensureUserRecords(userId: string, fallbackDisplayName: string) {
   if (profileError) {
     throw new Error(profileError.message);
   }
-
-  const { error: roleError } = await admin.from("user_roles").upsert(
-    {
-      user_id: userId,
-      role: "ku_member",
-      is_banned: false,
-    },
-    { onConflict: "user_id" }
-  );
-
-  if (roleError) {
-    console.warn("[ensureUserRecords:user_roles]", roleError.message);
-  }
 }
 
 export async function signUpWithEmail(

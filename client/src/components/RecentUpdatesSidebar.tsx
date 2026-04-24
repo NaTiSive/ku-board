@@ -1,81 +1,138 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { fetchFeedPage } from '../lib/feedApi'
+import Avatar from './Avatar'
+import { useAuth } from '../hooks/useAuth'
+import { fetchFollowing, type FollowUser } from '../lib/followsApi'
+import { fetchNotifications, markNotificationsRead, type NotificationItem } from '../lib/notificationsApi'
 import { serverBase } from '../lib/serverBase'
-import type { Post } from '../types'
 
 interface RecentUpdatesSidebarProps {
-  posts?: Post[]
-  loading?: boolean
-  error?: string
+  title?: string
+  refreshKey?: number
 }
 
-function getRecentUpdateLabel(post: Post) {
-  const text = post.title?.trim() || post.content.trim()
-  return text.length > 56 ? `${text.slice(0, 56).trimEnd()}...` : text
-}
-
-export default function RecentUpdatesSidebar({
-  posts,
-  loading: loadingProp,
-  error: errorProp,
-}: RecentUpdatesSidebarProps) {
-  const [fetchedPosts, setFetchedPosts] = useState<Post[]>([])
-  const [loadingState, setLoadingState] = useState(true)
-  const [errorState, setErrorState] = useState('')
+export default function RecentUpdatesSidebar({ title = 'Following', refreshKey = 0 }: RecentUpdatesSidebarProps) {
+  const { isGuest, user, loading: authLoading } = useAuth()
+  const [following, setFollowing] = useState<FollowUser[]>([])
+  const [notifications, setNotifications] = useState<NotificationItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
 
   useEffect(() => {
-    if (posts) {
+    if (authLoading) {
+      return
+    }
+
+    if (isGuest) {
+      setFollowing([])
+      setNotifications([])
+      setLoading(false)
+      setError('')
       return
     }
 
     let cancelled = false
 
-    const loadRecentUpdates = async () => {
-      setLoadingState(true)
-      setErrorState('')
+    async function loadSidebar() {
+      setLoading(true)
+      setError('')
 
       try {
-        const data = await fetchFeedPage(serverBase, 1, 3)
+        const [followingUsers, notificationData] = await Promise.all([
+          fetchFollowing(serverBase, user.id),
+          fetchNotifications(serverBase, 1, 100),
+        ])
+
         if (!cancelled) {
-          setFetchedPosts(data.posts)
+          setFollowing(followingUsers)
+          setNotifications(notificationData.notifications)
         }
       } catch (loadError) {
         if (!cancelled) {
-          setErrorState(loadError instanceof Error ? loadError.message : 'Failed to load recent updates')
+          setError(loadError instanceof Error ? loadError.message : 'Failed to load following list')
         }
       } finally {
         if (!cancelled) {
-          setLoadingState(false)
+          setLoading(false)
         }
       }
     }
 
-    void loadRecentUpdates()
+    void loadSidebar()
 
     return () => {
       cancelled = true
     }
-  }, [posts])
+  }, [authLoading, isGuest, refreshKey, user.id])
 
-  const recentUpdates = useMemo(() => (posts ?? fetchedPosts).slice(0, 3), [fetchedPosts, posts])
-  const isLoading = posts ? !!loadingProp : loadingState
-  const currentError = posts ? (errorProp ?? '') : errorState
+  const unreadByActor = useMemo(() => {
+    const next = new Map<string, string[]>()
+
+    notifications.forEach((item) => {
+      if (!item.actorId || item.isRead) {
+        return
+      }
+
+      const current = next.get(item.actorId) ?? []
+      current.push(item.id)
+      next.set(item.actorId, current)
+    })
+
+    return next
+  }, [notifications])
+
+  const handleCheckUpdates = async (followedUserId: string) => {
+    const unreadIds = unreadByActor.get(followedUserId) ?? []
+    if (unreadIds.length === 0) {
+      return
+    }
+
+    try {
+      await markNotificationsRead(serverBase, unreadIds)
+      setNotifications((current) =>
+        current.map((item) => (item.actorId === followedUserId ? { ...item, isRead: true } : item)),
+      )
+    } catch {
+      // ignore silent sidebar refresh errors
+    }
+  }
 
   return (
     <aside className="feed-side">
-      <div className="side-header">Recent Updates</div>
-      <div className="side-list">
-        {isLoading && <div className="side-item">Loading recent updates...</div>}
-        {!isLoading && !!currentError && <div className="side-item">Recent updates are unavailable right now.</div>}
-        {!isLoading && !currentError && recentUpdates.length === 0 && <div className="side-item">No recent updates yet.</div>}
-        {!isLoading &&
-          !currentError &&
-          recentUpdates.map((post) => (
-            <Link className="side-item" key={post.id} to={`/post/${post.id}`}>
-              {getRecentUpdateLabel(post)}
-            </Link>
-          ))}
+      <div className="side-header">{title}</div>
+      <div className="side-list side-list-tiles">
+        {loading && <div className="side-item">Loading followed users...</div>}
+        {!loading && !!error && <div className="side-item">Following is unavailable right now.</div>}
+        {!loading && !error && isGuest && <div className="side-item">Sign in to follow users and see them here.</div>}
+        {!loading && !error && !isGuest && following.length === 0 && (
+          <div className="side-item">Follow people to build your list here.</div>
+        )}
+        {!loading &&
+          !error &&
+          !isGuest &&
+          following.map((followedUser) => {
+            const hasUnread = (unreadByActor.get(followedUser.id) ?? []).length > 0
+
+            return (
+              <Link
+                className="follow-tile"
+                key={followedUser.id}
+                to={`/profile/${followedUser.id}`}
+                onClick={() => {
+                  void handleCheckUpdates(followedUser.id)
+                }}
+              >
+                <div className="follow-tile-avatar">
+                  <Avatar name={followedUser.displayName} imageUrl={followedUser.avatarUrl} />
+                  {hasUnread ? <span className="follow-tile-dot" aria-hidden="true" /> : null}
+                </div>
+                <div className="follow-tile-copy">
+                  <strong>{followedUser.displayName}</strong>
+                  <span className="muted">@{followedUser.handle}</span>
+                </div>
+              </Link>
+            )
+          })}
       </div>
     </aside>
   )

@@ -67,6 +67,9 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
   const [menuOpen, setMenuOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const isAuthor = user.id === post.author.id
+  const isAdmin = user.role === 'admin'
+  const canEditPost = isAuthor
+  const canDeletePost = isAuthor || isAdmin
   const authorProfileUrl = post.author.role !== 'guest' && post.author.id !== 'unknown' ? `/profile/${post.author.id}` : null
 
   const handleEdit = () => {
@@ -79,7 +82,19 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
       return
     }
 
-    const confirmed = window.confirm('Delete this post? This action cannot be undone.')
+    let adminReason = ''
+    if (isAdmin && !isAuthor) {
+      adminReason = window.prompt('Reason for deleting this post as admin:', '')?.trim() ?? ''
+      if (!adminReason) {
+        return
+      }
+    }
+
+    const confirmed = window.confirm(
+      isAdmin && !isAuthor
+        ? 'Delete this post as admin? This action cannot be undone.'
+        : 'Delete this post? This action cannot be undone.',
+    )
     if (!confirmed) {
       return
     }
@@ -88,7 +103,7 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
     setMenuOpen(false)
 
     try {
-      await deletePost(serverBase, post.id)
+      await deletePost(serverBase, post.id, adminReason || undefined)
 
       if (location.pathname === '/feed') {
         navigate(0)
@@ -128,7 +143,7 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
           </div>
         )}
         <span className="post-time">{formatDate(post.createdAt)}</span>
-        {isAuthor && (
+        {canDeletePost && (
           <div className="post-menu">
             <button
               className="icon-button"
@@ -141,11 +156,13 @@ export default function PostCard({ post, index = 0, showReport = false, showBack
             </button>
             {menuOpen && (
               <div className="post-menu-panel">
-                <button className="post-menu-item" type="button" onClick={handleEdit}>
-                  Edit
-                </button>
+                {canEditPost && (
+                  <button className="post-menu-item" type="button" onClick={handleEdit}>
+                    Edit
+                  </button>
+                )}
                 <button className="post-menu-item is-danger" type="button" onClick={handleDelete}>
-                  {deleting ? 'Deleting...' : 'Delete'}
+                  {deleting ? 'Deleting...' : isAdmin && !isAuthor ? 'Delete as Admin' : 'Delete'}
                 </button>
               </div>
             )}

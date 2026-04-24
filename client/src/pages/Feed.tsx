@@ -12,6 +12,51 @@ import { fetchFeedPage } from '../lib/feedApi'
 import { serverBase } from '../lib/serverBase'
 import type { Post } from '../types'
 
+function FeedLoadingSkeleton() {
+  return (
+    <div className="feed-layout">
+      <div className="feed-main">
+        {Array.from({ length: 3 }, (_, index) => (
+          <div className="card post-card-skeleton" key={index}>
+            <div className="post-skeleton-header">
+              <span className="skeleton skeleton-avatar" />
+              <div className="post-skeleton-meta">
+                <span className="skeleton skeleton-line skeleton-line-medium" />
+                <span className="skeleton skeleton-line skeleton-line-short" />
+              </div>
+              <span className="skeleton skeleton-chip" />
+            </div>
+            <span className="skeleton skeleton-line skeleton-line-title" />
+            <span className="skeleton skeleton-line skeleton-line-full" />
+            <span className="skeleton skeleton-line skeleton-line-full" />
+            <span className="skeleton skeleton-line skeleton-line-medium" />
+            <div className="skeleton skeleton-block skeleton-post-image" />
+            <div className="post-skeleton-actions">
+              <span className="skeleton skeleton-chip" />
+              <span className="skeleton skeleton-chip" />
+              <span className="skeleton skeleton-chip" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <aside className="feed-side">
+        <div className="side-header">Following</div>
+        <div className="side-list side-list-tiles">
+          {Array.from({ length: 4 }, (_, index) => (
+            <div className="follow-tile follow-tile-skeleton" key={index}>
+              <span className="skeleton skeleton-avatar" />
+              <div className="follow-tile-copy">
+                <span className="skeleton skeleton-line skeleton-line-medium" />
+                <span className="skeleton skeleton-line skeleton-line-short" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </aside>
+    </div>
+  )
+}
+
 export default function FeedPage() {
   const { isGuest, isIncognito, loading: authLoading, user } = useAuth()
   const [posts, setPosts] = useState<Post[]>([])
@@ -58,35 +103,31 @@ export default function FeedPage() {
           <span className="muted">{isIncognito ? 'Incognito mode disclaimer' : 'guest mode disclaimer'}</span>
         </div>
       )}
-      <div className="feed-layout">
-        <div className="feed-main">
-          {loading && (
-            <div className="card">
-              <h2>Loading feed...</h2>
-              <p className="muted">Fetching the latest posts from KUBoard.</p>
-            </div>
-          )}
+      {loading ? (
+        <FeedLoadingSkeleton />
+      ) : (
+        <div className="feed-layout">
+          <div className="feed-main">
+            {!!error && (
+              <div className="card">
+                <h2>Could not load feed</h2>
+                <p className="muted">{error}</p>
+              </div>
+            )}
 
-          {!loading && error && (
-            <div className="card">
-              <h2>Could not load feed</h2>
-              <p className="muted">{error}</p>
-            </div>
-          )}
+            {!error && posts.length === 0 && (
+              <div className="card">
+                <h2>No posts yet</h2>
+                <p className="muted">Be the first person to start the conversation.</p>
+              </div>
+            )}
 
-          {!loading && !error && posts.length === 0 && (
-            <div className="card">
-              <h2>No posts yet</h2>
-              <p className="muted">Be the first person to start the conversation.</p>
-            </div>
-          )}
-
-          {!loading &&
-            !error &&
-            posts.map((post, index) => <PostCard key={post.id} post={post} index={index} />)}
+            {!error &&
+              posts.map((post, index) => <PostCard key={post.id} post={post} index={index} />)}
+          </div>
+          <RecentUpdatesSidebar />
         </div>
-        <RecentUpdatesSidebar posts={posts} loading={loading} error={error} />
-      </div>
+      )}
     </section>
   )
 }

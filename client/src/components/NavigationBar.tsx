@@ -3,6 +3,35 @@ import { Link, NavLink, useLocation, useNavigate, useSearchParams } from 'react-
 import { useAuth } from '../hooks/useAuth'
 import KULogo from '../assets/ku-logo.svg'
 
+type SearchKind = 'posts' | 'hashtag' | 'users'
+
+function inferSearchType(value: string): SearchKind {
+  if (value.startsWith('#')) return 'hashtag'
+  if (value.startsWith('@')) return 'users'
+  return 'posts'
+}
+
+function normalizeSearchQuery(value: string) {
+  return value.replace(/^[@#]/, '')
+}
+
+function buildSearchUrl(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return '/search'
+
+  const type = inferSearchType(trimmed)
+  const query = normalizeSearchQuery(trimmed)
+  return `/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`
+}
+
+function formatSearchText(query: string, type: string | null) {
+  const trimmed = query.trim()
+  if (!trimmed) return ''
+  if (type === 'hashtag') return `#${trimmed}`
+  if (type === 'users') return `@${trimmed}`
+  return trimmed
+}
+
 function IconHome() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -95,10 +124,10 @@ export default function NavigationBar() {
   const { enterIncognito, exitIncognito, isAdmin, isGuest, isIncognito, logout } = useAuth()
   const [menuOpen, setMenuOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const [searchText, setSearchText] = useState('')
 
   useEffect(() => {
     const handleClick = (event: MouseEvent) => {
@@ -120,21 +149,16 @@ export default function NavigationBar() {
     }
   }, [])
 
-  useEffect(() => {
-    if (location.pathname === '/search') {
-      setSearchText(searchParams.get('q') ?? '')
-    }
-  }, [location.pathname, searchParams])
+  const currentSearchText = formatSearchText(searchParams.get('q') ?? '', searchParams.get('type'))
 
   const handleSearch = () => {
-    const trimmed = searchText.trim()
-    if (!trimmed) {
+    const nextValue = searchInputRef.current?.value ?? ''
+
+    if (!nextValue.trim()) {
       return
     }
 
-    const inferredType = trimmed.startsWith('#') ? 'hashtag' : trimmed.startsWith('@') ? 'users' : 'posts'
-    const query = trimmed.replace(/^[@#]/, '')
-    navigate(`/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(inferredType)}`)
+    navigate(buildSearchUrl(nextValue))
   }
 
   return (
@@ -152,10 +176,11 @@ export default function NavigationBar() {
           </button>
           <div className="topbar-search">
             <input
+              key={location.pathname === '/search' ? `search:${searchParams.toString()}` : `path:${location.pathname}`}
+              ref={searchInputRef}
               className="search-input"
               placeholder="Search posts, #hashtags, or @users"
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
+              defaultValue={location.pathname === '/search' ? currentSearchText : ''}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
                   handleSearch()
@@ -211,8 +236,9 @@ export default function NavigationBar() {
                       <button
                         className="menu-item"
                         type="button"
-                        onClick={() => {
-                          logout()
+                        onClick={async () => {
+                          await logout()
+                          navigate('/login', { replace: true })
                           setMenuOpen(false)
                         }}
                       >
@@ -251,12 +277,9 @@ export default function NavigationBar() {
                     <Link className="menu-item" to="/profile" onClick={() => setMenuOpen(false)}>
                       View Profile
                     </Link>
-                    <Link className="menu-item" to="/settings" onClick={() => setMenuOpen(false)}>
-                      Settings
-                    </Link>
                     {isAdmin && (
                       <Link className="menu-item" to="/admin/accounts" onClick={() => setMenuOpen(false)}>
-                        Account Management
+                        Admin
                       </Link>
                     )}
                     <button
@@ -269,16 +292,17 @@ export default function NavigationBar() {
                     >
                       Incognito Mode
                     </button>
-                    <Link
+                    <button
                       className="menu-item"
-                      to="/"
-                      onClick={() => {
-                        logout()
+                      type="button"
+                      onClick={async () => {
+                        await logout()
+                        navigate('/login', { replace: true })
                         setMenuOpen(false)
                       }}
                     >
                       Logout
-                    </Link>
+                    </button>
                   </div>
                 )}
               </div>

@@ -26,7 +26,7 @@ router.get("/:userId/followers", async (req: Request, res: Response) => {
         `
         follower_id,
         created_at,
-        profiles!follower_id ( id, display_name )
+        profiles!follower_id ( id, display_name, avatar_url )
         `
       )
       .eq("following_id", req.params.userId)
@@ -51,7 +51,7 @@ router.get("/:userId/following", async (req: Request, res: Response) => {
         `
         following_id,
         created_at,
-        profiles!following_id ( id, display_name )
+        profiles!following_id ( id, display_name, avatar_url )
         `
       )
       .eq("follower_id", req.params.userId)
