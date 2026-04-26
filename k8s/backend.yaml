@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: board-server
+  template:
+    metadata:
+      labels:
+        app: board-server
+    spec:
+      containers:
+        - name: server
+          image: board-server
+          imagePullPolicy: Never
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3001"
+            - name: SUPABASE_URL
+              value: "https://nripzvcjtoxvjzskejub.supabase.co/"
+            - name: SUPABASE_ANON_KEY
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI...Eg" # ใส่รหัสเต็มจาก .env
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI...Y" # ใส่รหัสเต็มจาก .env
+            - name: CLIENT_URL
+              value: "https://board.k8s.dev"
+            - name: SESSION_SECRET
+              value: "development-secret-key"
+            - name: MAX_FILE_SIZE
+              value: "20971520"
+            - name: CERT_THAI_FONT_PATH
+              value: "/app/fonts/THSarabunNew.ttf"
+            - name: GOOGLE_CLIENT_ID
+              value: "244625063763-rash8kdh10mf2bnv8k81c1b4g5curcil.apps.googleusercontent.com"
+            - name: GOOGLE_CLIENT_SECRET
+              value: "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"
+            - name: GOOGLE_CALLBACK_URL
+              value: "https://board.k8s.dev/api/auth/google/callback"
+          ports:
+            - containerPort: 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-server
+spec:
+  selector:
+    app: board-server
+  ports:
+    - port: 3001
+      targetPort: 3001

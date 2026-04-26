@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-client
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: board-client
+  template:
+    metadata:
+      labels:
+        app: board-client
+    spec:
+      containers:
+        - name: client
+          image: board-client
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-client
+spec:
+  selector:
+    app: board-client
+  ports:
+    - port: 80
+      targetPort: 80
