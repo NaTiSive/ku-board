@@ -24,9 +24,9 @@ spec:
             - name: SUPABASE_URL
               value: "https://nripzvcjtoxvjzskejub.supabase.co/"
             - name: SUPABASE_ANON_KEY
-              value: "eyJhbGciOiJIUzI1NiIsInR5cCI...Eg" # ใส่รหัสเต็มจาก .env
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yaXB6dmNqdG94dmp6c2tlanViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxOTQ3NDEsImV4cCI6MjA5MDc3MDc0MX0.nni3JhjV4gLD0RRBlDBmh4E0oELqlJHDxDFPv6qZ8Eg" # ใส่รหัสเต็มจาก .env
             - name: SUPABASE_SERVICE_ROLE_KEY
-              value: "eyJhbGciOiJIUzI1NiIsInR5cCI...Y" # ใส่รหัสเต็มจาก .env
+              value: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yaXB6dmNqdG94dmp6c2tlanViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTE5NDc0MSwiZXhwIjoyMDkwNzcwNzQxfQ.eUWYdidW_abc07Ocodp2_ndN3Ma2YfsFZNFOmqfVM7Y" # ใส่รหัสเต็มจาก .env
             - name: CLIENT_URL
               value: "https://board.k8s.dev"
             - name: SESSION_SECRET
@@ -36,9 +36,9 @@ spec:
             - name: CERT_THAI_FONT_PATH
               value: "/app/fonts/THSarabunNew.ttf"
             - name: GOOGLE_CLIENT_ID
-              value: "244625063763-rash8kdh10mf2bnv8k81c1b4g5curcil.apps.googleusercontent.com"
+              value: "YOUR_GOOGLE_CLIENT_ID_HERE"
             - name: GOOGLE_CLIENT_SECRET
-              value: "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"
+              value: "YOUR_GOOGLE_CLIENT_SECRET_HERE"
             - name: GOOGLE_CALLBACK_URL
               value: "https://board.k8s.dev/api/auth/google/callback"
           ports:

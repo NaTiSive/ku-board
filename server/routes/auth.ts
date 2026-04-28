@@ -90,7 +90,10 @@ router.get("/callback", async (req, res) => {
   const { error } = await exchangeOAuthCode(req, res, code);
 
   if (error) {
-    res.status(500).send("OAuth exchange failed");
+    console.error("[OAuth Callback Error]:", error.message);
+    
+    const clientUrl = process.env.CLIENT_URL ?? "http://localhost:5173";
+    res.redirect(`${clientUrl}/?error=oauth_failed`);
     return;
   }
 

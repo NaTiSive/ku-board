@@ -671,10 +671,8 @@ export default function Profile() {
         onConfirm={(image) => {
           if (cropTarget === 'cover') {
             setPendingCover(image)
-            setRemoveCover(false)
           } else if (cropTarget === 'avatar') {
             setPendingAvatar(image)
-            setRemoveAvatar(false)
           }
           setCropTarget(null)
         }}

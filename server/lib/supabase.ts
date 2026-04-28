@@ -29,7 +29,12 @@ export function createServerClient(req: Request, res: Response) {
         // เขียน cookie กลับผ่าน Express response
         setAll: (cookiesToSet) => {
           cookiesToSet.forEach(({ name, value, options }) => {
-            res.cookie(name, value, options);
+            // แฮ็กสำหรับเทสบน Minikube: ปลดเกราะ Secure ออกชั่วคราว เพื่อไม่ให้ Chrome บล็อก
+            res.cookie(name, value, { 
+              ...options, 
+              secure: false,     // <--- บังคับเป็น false
+              sameSite: "lax"    // <--- ตั้งค่าให้ส่งข้ามได้ปกติ
+            });
           });
         },
       },

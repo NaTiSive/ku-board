@@ -58,7 +58,7 @@ export default function ShareButton({ postId, shareUrl, initialCount }: ShareBut
     setLoading(true)
 
     try {
-      const platform = navigator.share ? 'web_share' : navigator.clipboard ? 'copy_link' : 'other'
+      const platform = ('share' in navigator) ? 'web_share' : ('clipboard' in navigator) ? 'copy_link' : 'other'
       const result = await recordShare(serverBase, postId, platform)
       const resolvedShareUrl = result.shareUrl || shareUrl
 
