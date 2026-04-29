@@ -1,1 +1,1 @@
-export const serverBase = import.meta.env.VITE_SERVER_URL ?? '/api'
+export const serverBase = import.meta.env.VITE_SERVER_URL ?? window.location.origin
