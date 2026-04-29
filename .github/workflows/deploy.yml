@@ -1,0 +1,26 @@
+name: Auto Deploy to Minikube
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted 
+    
+    steps:
+      - name: 📥 1. ดึงโค้ดล่าสุดลงมาที่ Runner
+        uses: actions/checkout@v4
+
+      - name: 🛠️ 2. แพ็คโค้ดฝั่ง Server (Backend)
+        run: minikube image build -t board-server ./server
+
+      - name: 🛠️ 3. แพ็คโค้ดฝั่ง Client (Frontend)
+        run: minikube image build -t board-client ./client
+
+      - name: 🚀 4. อัปเดต Server Pod
+        run: kubectl rollout restart deployment board-server
+
+      - name: 🚀 5. อัปเดต Client Pod
+        run: kubectl rollout restart deployment board-client
