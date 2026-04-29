@@ -187,7 +187,7 @@ export async function signInWithGoogle(req: Request, res: Response, redirectPath
   return supabase.auth.signInWithOAuth({
     provider: "google",
     options: {
-      redirectTo: buildOAuthCallbackUrl(req, redirectPath),
+      redirectTo: `${window.location.origin}/feed`,
       queryParams: { access_type: "offline", prompt: "consent" },
     },
   });
