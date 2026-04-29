@@ -19,6 +19,8 @@ client/dist/
 server/dist/
 dist-ssr/
 
+k8s/secret.yaml
+
 # =====================
 # Logs
 # =====================
