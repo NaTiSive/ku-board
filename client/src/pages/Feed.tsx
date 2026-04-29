@@ -99,7 +99,7 @@ export default function FeedPage() {
     <section className="page">
       {isGuest && (
         <div className="card incognito-banner">
-          <strong>{isIncognito ? "You're in ไม่ระบุตัวตน mode" : "You're in ใครไม่รู้ mode"}</strong>
+          <strong>{isIncognito ? "You're in ไม่ระบุตัวตน mode." : "You're in ใครไม่รู้ mode."}</strong>
           <span className="muted">{isIncognito ? 'Incognito mode disclaimer' : 'guest mode disclaimer'}</span>
         </div>
       )}
