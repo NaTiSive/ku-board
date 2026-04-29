@@ -36,9 +36,9 @@ spec:
             - name: CERT_THAI_FONT_PATH
               value: "/app/fonts/THSarabunNew.ttf"
             - name: GOOGLE_CLIENT_ID
-              value: "21602642313-ihdl5jo06c9nqednfk52n2hqm9bl35k1.apps.googleusercontent.com"
+              value: "GOOGLE_CLIENT_ID"
             - name: GOOGLE_CLIENT_SECRET
-              value: "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"
+              value: "GOOGLE_CLIENT_SECRET"
             - name: GOOGLE_CALLBACK_URL
               value: "https://board.k8s.dev/api/auth/google/callback"
           ports:
