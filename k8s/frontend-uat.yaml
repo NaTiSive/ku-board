@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-client-uat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: board-client-uat
+  template:
+    metadata:
+      labels:
+        app: board-client-uat
+    spec:
+      containers:
+        - name: client
+          image: board-client  
+          imagePullPolicy: Never
+          env:
+            - name: VITE_SUPABASE_URL  
+              value: "https://bmgvzucxpuluekkhnpfg.supabase.co" 
+            - name: VITE_SUPABASE_ANON_KEY 
+              valueFrom:
+                secretKeyRef:
+                  name: board-secrets-uat
+                  key: SUPABASE_ANON_KEY
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-client-uat
+spec:
+  selector:
+    app: board-client-uat
+  ports:
+    - port: 80
+      targetPort: 80

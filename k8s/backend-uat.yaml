@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: board-server-uat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: board-server-uat
+  template:
+    metadata:
+      labels:
+        app: board-server-uat
+    spec:
+      containers:
+        - name: server
+          image: board-server
+          imagePullPolicy: Never
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: PORT
+              value: "3001"
+            - name: SUPABASE_URL
+              value: "https://bmgvzucxpuluekkhnpfg.supabase.co" 
+            
+            - name: CLIENT_URL
+              value: "https://uat.board.k8s.dev"
+            - name: GOOGLE_CALLBACK_URL
+              value: "https://uat.board.k8s.dev/api/auth/google/callback"
+            
+            - name: SUPABASE_ANON_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: board-secrets-uat  
+                  key: SUPABASE_ANON_KEY
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: board-secrets-uat  
+                  key: SUPABASE_SERVICE_ROLE_KEY
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: board-secrets-uat  
+                  key: GOOGLE_CLIENT_ID
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: board-secrets-uat  
+                  key: GOOGLE_CLIENT_SECRET
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: board-secrets-uat  
+                  key: SESSION_SECRET
+          ports:
+            - containerPort: 3001
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: board-server-uat
+spec:
+  selector:
+    app: board-server-uat
+  ports:
+    - port: 3001
+      targetPort: 3001

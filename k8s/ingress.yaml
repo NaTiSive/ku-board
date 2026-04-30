@@ -9,6 +9,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
+  
     - host: board.k8s.dev
       http:
         paths:
@@ -16,14 +17,14 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: board-client
+                name: board-client  
                 port:
                   number: 80
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: board-server
+                name: board-server  
                 port:
                   number: 3001
 
@@ -34,13 +35,13 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: board-client
+                name: board-client-uat  
                 port:
                   number: 80
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: board-server
+                name: board-server-uat  
                 port:
                   number: 3001
